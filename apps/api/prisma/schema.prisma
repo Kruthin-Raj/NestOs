@@ -1,0 +1,769 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  OWNER
+  TENANT
+}
+
+enum OwnerVerificationStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum BuildingType {
+  PG
+  HOSTEL
+  APARTMENT
+  SHARED_FLAT
+}
+
+enum GenderPreference {
+  MALE
+  FEMALE
+  CO_ED
+}
+
+enum BuildingStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  UNDER_REVIEW
+}
+
+enum RoomType {
+  PRIVATE
+  SHARED
+  DORMITORY
+}
+
+enum BedStatus {
+  VACANT
+  RESERVED
+  OCCUPIED
+  BLOCKED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  FAILED
+}
+
+enum PaymentType {
+  BOOKING_DEPOSIT
+  SECURITY_DEPOSIT
+  RENT
+  PENALTY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum IssuePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+  REOPENED
+}
+
+enum IssueCategory {
+  MAINTENANCE
+  PLUMBING
+  ELECTRICAL
+  CLEANLINESS
+  SECURITY
+  WIFI
+  APPLIANCE
+  NOISE
+  OTHER
+}
+
+enum IssueCommentAuthorRole {
+  TENANT
+  OWNER
+}
+
+enum NoticeTargetType {
+  ALL_BUILDINGS
+  BUILDING
+  FLOOR
+  ROOM
+  TENANT
+}
+
+enum NoticeCategory {
+  MAINTENANCE
+  SECURITY
+  RENT_REMINDER
+  VISITOR
+  DELIVERY
+  RULE_REMINDER
+  GENERAL
+}
+
+enum DocumentType {
+  AADHAAR_FRONT
+  AADHAAR_BACK
+  PAN_CARD
+  PASSPORT
+  DRIVING_LICENCE
+  VOTER_ID
+  PROPERTY_DEED
+  LEASE_AGREEMENT
+  UTILITY_BILL
+  PROPERTY_TAX
+  SELFIE
+  OTHER
+}
+
+enum DocumentStatus {
+  UPLOADED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum TenantStatus {
+  ONBOARDING
+  SEARCHING
+  RESERVED
+  ACTIVE
+  MOVED_OUT
+}
+
+enum RentCycle {
+  MONTHLY
+}
+
+enum AuditAction {
+  USER_CREATED
+  USER_LOGIN
+  OWNER_VERIFIED
+  OWNER_REJECTED
+  BUILDING_CREATED
+  BED_STATUS_CHANGED
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  ISSUE_CREATED
+  ISSUE_STATUS_CHANGED
+  NOTICE_CREATED
+  DOCUMENT_UPLOADED
+  DOCUMENT_VERIFIED
+  TENANT_MOVED_IN
+  TENANT_MOVED_OUT
+}
+
+// ============================================================
+// AUTH MODELS
+// ============================================================
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  phone           String?   @unique
+  role            UserRole
+  isEmailVerified Boolean   @default(false)
+  isPhoneVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  ownerProfile    OwnerProfile?
+  tenantProfile   TenantProfile?
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+  issueComments   IssueComment[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model OtpCode {
+  id          String    @id @default(uuid())
+  identifier  String    // email or phone
+  codeHash    String    // bcrypt hash
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+// OWNER MODELS
+// ============================================================
+
+model OwnerProfile {
+  id                  String                  @id @default(uuid())
+  userId              String                  @unique
+  fullName            String
+  businessName        String?
+  upiId               String?                 // e.g. "owner@upi" — used for collecting payments
+  verificationStatus  OwnerVerificationStatus @default(PENDING)
+  verificationNotes   String?
+  verifiedAt          DateTime?
+  verifiedBy          String?
+  panNumber           String?
+  aadhaarNumber       String?
+  selfieUrl           String?
+  city                String?
+  state               String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents           OwnerDocument[]
+  buildings           Building[]
+  issues              Issue[]
+  notices             Notice[]
+  payments            Payment[]
+  bookings            Booking[]
+
+  @@index([userId])
+  @@index([verificationStatus])
+  @@map("owner_profiles")
+}
+
+model OwnerDocument {
+  id            String         @id @default(uuid())
+  ownerId       String
+  documentType  DocumentType
+  fileUrl       String
+  fileKey       String
+  fileName      String?
+  fileSizeBytes Int?
+  mimeType      String?
+  status        DocumentStatus @default(UPLOADED)
+  reviewNotes   String?
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  owner         OwnerProfile   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("owner_documents")
+}
+
+// ============================================================
+// TENANT MODELS
+// ============================================================
+
+model TenantProfile {
+  id                  String       @id @default(uuid())
+  userId              String       @unique
+  fullName            String
+  dateOfBirth         DateTime?
+  gender              String?
+  phone               String?
+  profession          String?
+  employerOrCollege   String?
+  city                String?
+  status              TenantStatus @default(ONBOARDING)
+  profileCompletion   Int          @default(0)
+  aadhaarNumber       String?
+  isIdVerified        Boolean      @default(false)
+  idVerifiedAt        DateTime?
+  emergencyName       String?
+  emergencyPhone      String?
+  emergencyRelation   String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferences         TenantPreferences?
+  documents           TenantDocument[]
+  bookings            Booking[]
+  payments            Payment[]
+  issues              Issue[]
+  currentBed          Bed[]        @relation("CurrentTenant")
+  noticeReads         NoticeRead[]
+  targetedNotices     Notice[]     @relation("TargetTenant")
+
+  @@index([userId])
+  @@index([status])
+  @@index([gender])
+  @@map("tenant_profiles")
+}
+
+model TenantPreferences {
+  id                    String   @id @default(uuid())
+  tenantId              String   @unique
+  smoking               String?
+  drinking              String?
+  foodPreference        String?
+  sleepSchedule         String?
+  workSchedule          String?
+  cleanlinessLevel      String?
+  noiseLevel            String?
+  guestsAllowed         String?
+  petsAllowed           Boolean?
+  preferredGender       String?
+  preferredSmoking      String?
+  preferredFoodPref     String?
+  preferredSleepSchedule String?
+  preferredCleanliness  String?
+  personalIcks          String?
+  compatibilityBio      String?  @db.VarChar(500)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant                TenantProfile @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_preferences")
+}
+
+model TenantDocument {
+  id            String         @id @default(uuid())
+  tenantId      String
+  documentType  DocumentType
+  fileUrl       String
+  fileKey       String
+  fileName      String?
+  fileSizeBytes Int?
+  mimeType      String?
+  status        DocumentStatus @default(UPLOADED)
+  reviewNotes   String?
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  tenant        TenantProfile  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_documents")
+}
+
+// ============================================================
+// PROPERTY MODELS
+// ============================================================
+
+model Building {
+  id                String          @id @default(uuid())
+  ownerId           String
+  name              String
+  type              BuildingType
+  status            BuildingStatus  @default(DRAFT)
+  genderPreference  GenderPreference @default(CO_ED)
+  addressLine1      String
+  addressLine2      String?
+  landmark          String?
+  city              String
+  state             String
+  pincode           String
+  latitude          Decimal?        @db.Decimal(10, 7)
+  longitude         Decimal?        @db.Decimal(10, 7)
+  totalFloors       Int             @default(1)
+  description       String?
+  rules             String?
+  depositMonths     Int             @default(2)
+  depositFixed      Decimal?        @db.Decimal(12, 2)
+  rentCycle         RentCycle       @default(MONTHLY)
+  rentDueDay        Int             @default(1)
+  contactPhone      String?
+  contactEmail      String?
+  totalBeds         Int             @default(0)
+  occupiedBeds      Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  owner             OwnerProfile    @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  amenities         BuildingAmenity[]
+  photos            BuildingPhoto[]
+  floors            Floor[]
+  rooms             Room[]
+  beds              Bed[]
+  bookings          Booking[]
+  payments          Payment[]
+  issues            Issue[]
+  notices           Notice[]
+
+  @@index([ownerId])
+  @@index([city])
+  @@index([status])
+  @@index([latitude, longitude])
+  @@map("buildings")
+}
+
+model BuildingAmenity {
+  id          String   @id @default(uuid())
+  buildingId  String
+  name        String
+
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId])
+  @@map("building_amenities")
+}
+
+model BuildingPhoto {
+  id          String   @id @default(uuid())
+  buildingId  String
+  fileUrl     String
+  fileKey     String
+  caption     String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId])
+  @@map("building_photos")
+}
+
+model Floor {
+  id          String    @id @default(uuid())
+  buildingId  String
+  floorNumber Int
+  label       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  building    Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  rooms       Room[]
+  notices     Notice[]
+
+  @@unique([buildingId, floorNumber])
+  @@index([buildingId])
+  @@map("floors")
+}
+
+model Room {
+  id            String    @id @default(uuid())
+  floorId       String
+  buildingId    String
+  roomNumber    String
+  type          RoomType
+  capacity      Int       @default(1)
+  currentCount  Int       @default(0)
+  baseRent      Decimal   @db.Decimal(12, 2)
+  description   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  floor         Floor     @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  building      Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  amenities     RoomAmenity[]
+  beds          Bed[]
+  issues        Issue[]
+  notices       Notice[]
+
+  @@unique([buildingId, roomNumber])
+  @@index([floorId])
+  @@index([buildingId])
+  @@map("rooms")
+}
+
+model RoomAmenity {
+  id      String @id @default(uuid())
+  roomId  String
+  name    String
+
+  room    Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_amenities")
+}
+
+model Bed {
+  id              String    @id @default(uuid())
+  roomId          String
+  buildingId      String
+  bedLabel        String
+  status          BedStatus @default(VACANT)
+  monthlyRent     Decimal   @db.Decimal(12, 2)
+  currentTenantId String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  building        Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  currentTenant   TenantProfile? @relation("CurrentTenant", fields: [currentTenantId], references: [id])
+  bookings        Booking[]
+  issues          Issue[]
+
+  @@unique([roomId, bedLabel])
+  @@index([roomId])
+  @@index([buildingId])
+  @@index([status])
+  @@index([currentTenantId])
+  @@map("beds")
+}
+
+// ============================================================
+// BOOKING MODEL
+// ============================================================
+
+model Booking {
+  id                  String        @id @default(uuid())
+  tenantId            String
+  bedId               String
+  roomId              String
+  buildingId          String
+  ownerId             String
+  status              BookingStatus @default(PENDING)
+  moveInDate          DateTime
+  moveOutDate         DateTime?
+  actualMoveOutDate   DateTime?
+  monthlyRent         Decimal       @db.Decimal(12, 2)
+  depositAmount       Decimal       @db.Decimal(12, 2)
+  depositPaid         Boolean       @default(false)
+  depositRefunded     Boolean       @default(false)
+  depositRefundedAt   DateTime?
+  cancelledAt         DateTime?
+  cancelledBy         String?
+  cancellationReason  String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  tenant              TenantProfile  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  bed                 Bed            @relation(fields: [bedId], references: [id], onDelete: Restrict)
+  building            Building       @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  owner               OwnerProfile   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  payments            Payment[]
+
+  @@index([tenantId])
+  @@index([bedId])
+  @@index([buildingId])
+  @@index([ownerId])
+  @@index([status])
+  @@map("bookings")
+}
+
+// ============================================================
+// PAYMENT MODEL
+// ============================================================
+
+model Payment {
+  id                  String        @id @default(uuid())
+  bookingId           String
+  tenantId            String
+  ownerId             String
+  buildingId          String
+  type                PaymentType
+  status              PaymentStatus @default(PENDING)
+  amountRupees        Decimal       @db.Decimal(12, 2)
+  billingMonth        Int?
+  billingYear         Int?
+  upiTransactionId    String?       // UTR / transaction ref entered by tenant
+  confirmedByOwnerId  String?       // Owner who confirmed the payment
+  confirmedAt         DateTime?     // When payment was confirmed by owner
+  failureReason       String?
+  failedAt            DateTime?
+  receiptNumber       String?       @unique
+  receiptUrl          String?
+  refundedAt          DateTime?
+  refundAmount        Decimal?      @db.Decimal(12, 2)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  booking             Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  tenant              TenantProfile  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  owner               OwnerProfile   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  building            Building       @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([tenantId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([type])
+  @@index([billingYear, billingMonth])
+  @@map("payments")
+}
+
+// ============================================================
+// ISSUE MODELS
+// ============================================================
+
+model Issue {
+  id              String        @id @default(uuid())
+  tenantId        String
+  buildingId      String
+  ownerId         String
+  roomId          String?
+  bedId           String?
+  category        IssueCategory
+  priority        IssuePriority @default(MEDIUM)
+  status          IssueStatus   @default(OPEN)
+  title           String
+  description     String
+  photoUrls       String[]
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  rejectedAt      DateTime?
+  rejectedBy      String?
+  rejectionReason String?
+  reopenedAt      DateTime?
+  reopenDeadline  DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  tenant          TenantProfile  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  building        Building       @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  owner           OwnerProfile   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  room            Room?          @relation(fields: [roomId], references: [id])
+  bed             Bed?           @relation(fields: [bedId], references: [id])
+  comments        IssueComment[]
+
+  @@index([tenantId])
+  @@index([buildingId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([priority])
+  @@map("issues")
+}
+
+model IssueComment {
+  id          String                 @id @default(uuid())
+  issueId     String
+  authorId    String
+  authorRole  IssueCommentAuthorRole
+  body        String
+  photoUrls   String[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  deletedAt   DateTime?
+
+  issue       Issue   @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author      User    @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([issueId])
+  @@map("issue_comments")
+}
+
+// ============================================================
+// NOTICE MODELS
+// ============================================================
+
+model Notice {
+  id                String           @id @default(uuid())
+  ownerId           String
+  title             String
+  body              String
+  category          NoticeCategory   @default(GENERAL)
+  targetType        NoticeTargetType
+  targetBuildingId  String?
+  targetFloorId     String?
+  targetRoomId      String?
+  targetTenantId    String?
+  publishAt         DateTime         @default(now())
+  expiresAt         DateTime?
+  sendEmail         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+
+  owner             OwnerProfile    @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  targetBuilding    Building?       @relation(fields: [targetBuildingId], references: [id])
+  targetFloor       Floor?          @relation(fields: [targetFloorId], references: [id])
+  targetRoom        Room?           @relation(fields: [targetRoomId], references: [id])
+  targetTenant      TenantProfile?  @relation("TargetTenant", fields: [targetTenantId], references: [id])
+  reads             NoticeRead[]
+
+  @@index([ownerId])
+  @@index([targetType])
+  @@index([targetBuildingId])
+  @@index([publishAt])
+  @@map("notices")
+}
+
+model NoticeRead {
+  id        String   @id @default(uuid())
+  noticeId  String
+  tenantId  String
+  readAt    DateTime @default(now())
+
+  notice    Notice        @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  tenant    TenantProfile @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([noticeId, tenantId])
+  @@index([tenantId])
+  @@map("notice_reads")
+}
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  actorId     String?
+  actorRole   UserRole?
+  action      AuditAction
+  entityType  String?
+  entityId    String?
+  metadata    Json        @default("{}")
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  actor       User?       @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

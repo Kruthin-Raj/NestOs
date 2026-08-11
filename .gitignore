@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment Variables (CRITICAL: Do not upload passwords)
+.env
+.env.*
+!.env.example
+
+# Next.js / Vite Build output
+.next/
+dist/
+build/
+.output/
+
+# API File Uploads (Local Storage)
+apps/api/uploads/
+uploads/
+
+# OS Files
+.DS_Store
+Thumbs.db
