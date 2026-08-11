@@ -4,7 +4,7 @@ NestOS is a comprehensive platform for managing PGs, hostels, and shared accommo
 
 ## Tech Stack
 
-- **Frontend**: Next.js, React, Tailwind CSS, React Query, Zustand, Leaflet (Maps)
+- **Frontend**: Vite, React, Tailwind CSS, React Query, Zustand, Leaflet (Maps)
 - **Backend**: Node.js, Express.js, Prisma ORM
 - **Database**: PostgreSQL (hosted on Supabase)
 - **Payments**: Direct UPI Intent (Zero fee)
@@ -53,9 +53,9 @@ FRONTEND_URL=http://localhost:3000
 Open `apps/web/.env.local` (or create it if it doesn't exist).
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
-NEXT_PUBLIC_APP_NAME=NestOS
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+VITE_API_URL=http://localhost:4000/api/v1
+VITE_APP_NAME=NestOS
+VITE_APP_URL=http://localhost:3000
 ```
 
 *Note: There is also a root `.env` file that can be used to set variables globally.*
@@ -103,7 +103,7 @@ npm run dev
 cd apps/web
 npm run dev
 ```
-*The Web app will start at http://localhost:3000*
+*The Web app will start instantly at http://localhost:3000 (Vite is incredibly fast!)*
 
 ### 6. Verify
 
@@ -112,7 +112,7 @@ Open your browser and navigate to `http://localhost:3000`. You should see the Ne
 ## Project Structure
 
 - `/apps/api`: Node.js Express backend, Prisma schema, and business logic.
-- `/apps/web`: Next.js React frontend, components, and UI pages.
+- `/apps/web`: Vite React frontend, components, and UI pages.
 
 ## Collaboration
 
