@@ -12,9 +12,10 @@ dist/
 build/
 .output/
 
-# API File Uploads (Local Storage)
+# API File Uploads (Local Storage) — user PII, never commit.
+# Anchored on purpose: a bare `uploads/` also swallows source
+# directories such as apps/api/src/modules/uploads/.
 apps/api/uploads/
-uploads/
 
 # OS Files
 .DS_Store
