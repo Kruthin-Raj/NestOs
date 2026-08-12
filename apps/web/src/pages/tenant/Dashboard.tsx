@@ -142,6 +142,18 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
   const issues   = data.issues  as { open: number; recent: Array<{ id: string; title: string; status: string }> }
   const notices  = data.notices as { unreadCount: number; recent: Array<{ id: string; title: string; isRead: boolean }> }
 
+  // The API returns these only for tenants with a CONFIRMED booking
+  // (buildQuickActions in dashboard.service.ts). They carry no bookingId, so
+  // PAY_RENT links to the payments page, which resolves the active booking.
+  const quickActions = (data.quickActions ?? []) as Array<{
+    label: string; action: string; amount?: number
+  }>
+
+  const QUICK_ACTION_LINKS: Record<string, string> = {
+    PAY_RENT:    '/tenant/payments',
+    RAISE_ISSUE: '/tenant/issues',
+  }
+
   const RentStatusIcon = rent?.currentMonthStatus === 'SUCCESS'
     ? CheckCircle
     : rent?.currentMonthStatus === 'FAILED'
@@ -164,6 +176,20 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
           </p>
         )}
       </div>
+
+      {/* Quick actions */}
+      {quickActions.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {quickActions.map((a) => (
+            <Link key={a.action} to={QUICK_ACTION_LINKS[a.action] ?? '/tenant/dashboard'}>
+              <Button size="sm" variant="outline">
+                {a.label}
+                {a.amount != null && ` · ${formatRupees(a.amount)}`}
+              </Button>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Rent card */}
       <Card>
