@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lost Items • The Apollo University</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container nav">
+      <div class="brand">
+        <img class="logo-img" src="apollo-logo.svg" alt="The Apollo University logo">
+        <div class="brand-title">The Apollo University – Lost & Found Portal</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link" href="report-lost.html">Report Lost</a>
+        <a class="nav-link" href="report-found.html">Report Found</a>
+        <a class="nav-link" href="admin.html">Admin</a>
+        <button id="theme_toggle" class="theme-toggle" title="Toggle Light/Dark Mode">🌙</button>
+        <span class="pill" id="login_state">Guest</span>
+        <button id="login_btn" class="login-btn">Login</button>
+      </div>
+    </div>
+  </header>
+  <main class="section">
+    <div class="container">
+      <div class="filters">
+        <input id="search_q" class="input" placeholder="Search by description, category, location">
+        <select id="filter_category" class="select">
+          <option value="">All Categories</option>
+          <option>Book</option>
+          <option>Wallet</option>
+          <option>Phone</option>
+          <option>ID Card</option>
+          <option>Electronics</option>
+          <option>Other</option>
+        </select>
+        <select id="filter_location" class="select">
+          <option value="">All Locations</option>
+          <option>Hostel</option>
+          <option>Library</option>
+          <option>Cafeteria</option>
+          <option>Classroom</option>
+          <option>Ground</option>
+          <option>Auditorium</option>
+          <option>Parking</option>
+        </select>
+        <input type="date" id="filter_date" class="date">
+      </div>
+      <div id="listings" class="cards"></div>
+      <div class="guidelines" style="margin-top:18px">
+        <div>Do not share sensitive details publicly</div>
+        <div>Meet in safe campus locations</div>
+        <div>Verify item ownership before returning</div>
+      </div>
+    </div>
+  </main>
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>The Apollo University – Student Welfare Initiative</div>
+      <div>Contact: welfare@apollo.edu.in • +91 99999 99999</div>
+      <div>© 2026 The Apollo University</div>
+    </div>
+  </footer>
+  <div id="toast" class="toast"></div>
+  <script src="client.js"></script>
+</body>
+</html>

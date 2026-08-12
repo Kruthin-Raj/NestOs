@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Apollo University – Lost & Found Portal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container nav">
+      <div class="brand">
+        <img class="logo-img" src="apollo-logo.svg" alt="The Apollo University logo">
+        <div class="brand-title">The Apollo University – Lost & Found Portal</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link" href="report-lost.html">Report Lost</a>
+        <a class="nav-link" href="report-found.html">Report Found</a>
+        <a class="nav-link" href="listings.html">Lost Items</a>
+        <a class="nav-link" href="admin.html">Admin</a>
+        <button id="theme_toggle" class="theme-toggle" title="Toggle Light/Dark Mode">🌙</button>
+        <span class="pill" id="login_state">Guest</span>
+        <button id="login_btn" class="login-btn">Login</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-card">
+          <div>
+            <div class="hero-title">Lost Something? Let <span class="hero-title-highlight">The Apollo Community</span> Help You Find It</div>
+            <p class="hero-desc">Report lost or found items and connect with students to return belongings safely. Simple, fast, and campus-friendly.</p>
+            <div class="hero-actions">
+              <a class="btn" href="report-lost.html">Report Lost Item</a>
+              <a class="btn secondary" href="report-found.html">Found an Item? Report Here</a>
+              <a class="btn light" href="listings.html">Browse Lost Items</a>
+            </div>
+          </div>
+          <div>
+            <div class="cards">
+              <div class="card">
+                <div class="card-img">📚</div>
+                <div class="card-body">
+                  <div class="card-title">Books</div>
+                  <div class="card-meta"><div>Library</div><div>Academics</div></div>
+                  <div class="pill">Textbooks, notes, journals</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-img">💳</div>
+                <div class="card-body">
+                  <div class="card-title">Wallet</div>
+                  <div class="card-meta"><div>Cafeteria</div><div>Hostel</div></div>
+                  <div class="pill">Cards, cash, IDs</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-img">📱</div>
+                <div class="card-body">
+                  <div class="card-title">Phone</div>
+                  <div class="card-meta"><div>Classroom</div><div>Ground</div></div>
+                  <div class="pill">Mobile devices</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="stats-banner">
+          <div class="stat-card">
+            <div class="stat-num" id="stat_total">--</div>
+            <div class="stat-lbl">Items Reported</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="stat_reunited">98%</div>
+            <div class="stat-lbl">Return Rate</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">6</div>
+            <div class="stat-lbl">Categories</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">7</div>
+            <div class="stat-lbl">Campus Zones</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container grid-2">
+        <div class="form">
+          <div class="form-title">How it works</div>
+          <div class="field">
+            <div class="pill">Submit a lost or found item</div>
+          </div>
+          <div class="field">
+            <div class="pill">Items appear after admin moderation</div>
+          </div>
+          <div class="field">
+            <div class="pill">Use contact to arrange a safe return</div>
+          </div>
+        </div>
+        <div class="guidelines">
+          <div>Do not share sensitive details publicly</div>
+          <div>Meet in safe campus locations</div>
+          <div>Verify item ownership before returning</div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>The Apollo University – Student Welfare Initiative</div>
+      <div>Contact: welfare@apollo.edu.in • +91 99999 99999</div>
+      <div>© 2026 The Apollo University</div>
+    </div>
+  </footer>
+  <div id="toast" class="toast"></div>
+  <script src="client.js"></script>
+</body>
+</html>

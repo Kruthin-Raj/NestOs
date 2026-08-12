@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 310" width="100%" height="100%">
+  <defs>
+    <linearGradient id="apolloFlameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFC800"/>
+      <stop offset="50%" stop-color="#FAA61A"/>
+      <stop offset="100%" stop-color="#E07000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Flame Swoop Emblem (Top Right) -->
+  <g transform="translate(265, 5)">
+    <!-- Main swooping upper flame -->
+    <path d="M 5 155 C 5 95, 35 35, 105 0 C 75 45, 60 95, 120 135 C 90 115, 45 135, 5 155 Z" fill="url(#apolloFlameGrad)" />
+    <!-- Secondary inner swoop -->
+    <path d="M 20 65 C 45 55, 85 65, 118 98 C 75 85, 48 95, 22 120 C 36 98, 40 76, 20 65 Z" fill="url(#apolloFlameGrad)" />
+  </g>
+
+  <!-- Typography -->
+  <!-- "The" -->
+  <text x="75" y="105" font-family="'Segoe UI', system-ui, -apple-system, Roboto, sans-serif" font-size="34" font-weight="600" fill="#6E7277">The</text>
+
+  <!-- "Apollo" -->
+  <text x="0" y="198" font-family="'Segoe UI', system-ui, -apple-system, Roboto, sans-serif" font-size="90" font-weight="700" fill="#007DA5" letter-spacing="-1">Apollo</text>
+
+  <!-- "University" -->
+  <text x="142" y="245" font-family="'Segoe UI', system-ui, -apple-system, Roboto, sans-serif" font-size="36" font-weight="600" fill="#6E7277">University</text>
+
+  <!-- "A DIVISION OF AHERF" -->
+  <text x="15" y="295" font-family="'Segoe UI', system-ui, -apple-system, Roboto, sans-serif" font-size="20" font-weight="700" fill="#007DA5" letter-spacing="4.5">A DIVISION OF AHERF</text>
+</svg>
