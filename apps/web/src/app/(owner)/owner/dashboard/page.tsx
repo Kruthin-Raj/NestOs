@@ -1,19 +1,15 @@
-'use client'
-import { Building2, Users, CreditCard, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
+import { Building2, CreditCard, AlertCircle, TrendingDown } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { EmptyState } from '@/components/feedback/empty-state'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { useOwnerDashboard } from '@/features/owner/dashboard/hooks/use-owner-dashboard'
-import { formatRupees, formatDateTime, relativeTime } from '@/lib/utils/format'
+import { formatRupees, relativeTime } from '@/lib/utils/format'
 import { cn } from '@/lib/utils/cn'
 import { Link } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
 
 export default function OwnerDashboardPage() {
-  const navigate = useNavigate()
   const { data, isLoading } = useOwnerDashboard()
 
   if (isLoading) return <PageLoader />

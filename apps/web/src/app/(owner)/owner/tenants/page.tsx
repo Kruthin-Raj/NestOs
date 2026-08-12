@@ -1,7 +1,6 @@
-'use client'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, User } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'

@@ -1,6 +1,4 @@
-'use client'
 import { useQuery } from '@tanstack/react-query'
-import { CreditCard, TrendingUp } from 'lucide-react'
 import { Card, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'

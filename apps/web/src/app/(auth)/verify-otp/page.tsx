@@ -1,9 +1,5 @@
-'use client'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { verifyOtp, sendOtp } from '@/features/auth/services/auth.service'
@@ -16,7 +12,6 @@ export default function VerifyOtpPage() {
   const [searchParams] = useSearchParams()
   const email        = searchParams.get('email') ?? ''
   const role         = searchParams.get('role') ?? undefined
-  const isNew        = searchParams.get('isNew') === '1'
   const redirect     = searchParams.get('redirect') ?? ''
 
   const setUser  = useAuthStore((s) => s.setUser)

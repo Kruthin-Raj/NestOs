@@ -1,14 +1,12 @@
-'use client'
 import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import {
-  MapPin, Bed, Users, CreditCard, Plus,
+  MapPin, Plus,
   Settings, ToggleLeft, ToggleRight, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { EmptyState } from '@/components/feedback/empty-state'

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { getMe, logout } from '../services/auth.service'
 import { useAuthStore } from '@/store/auth.store'
 import { QUERY_KEYS } from '@/lib/utils/constants'
-import { showToast } from '@/components/ui/toaster'
 
 export function useMe() {
   const setUser = useAuthStore((s) => s.setUser)

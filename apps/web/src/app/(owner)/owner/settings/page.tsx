@@ -1,4 +1,3 @@
-'use client'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,6 +28,7 @@ export default function OwnerSettingsPage() {
   const profile = user?.ownerProfile
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
       fullName:     profile?.fullName ?? '',
       businessName: profile?.businessName ?? '',

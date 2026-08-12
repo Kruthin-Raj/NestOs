@@ -1,4 +1,3 @@
-'use client'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Bell, Trash2 } from 'lucide-react'
@@ -14,6 +13,7 @@ import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { EmptyState } from '@/components/feedback/empty-state'
+import { PageLoader } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
 import { QUERY_KEYS, NOTICE_CATEGORIES } from '@/lib/utils/constants'
 import { formatDateTime } from '@/lib/utils/format'
@@ -66,6 +66,8 @@ export default function OwnerNoticesPage() {
   })
 
   const notices: Notice[] = data?.items ?? []
+
+  if (isLoading) return <PageLoader />
 
   return (
     <div className="space-y-6">

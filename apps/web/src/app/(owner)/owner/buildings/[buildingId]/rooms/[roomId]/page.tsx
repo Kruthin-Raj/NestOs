@@ -1,4 +1,3 @@
-'use client'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'

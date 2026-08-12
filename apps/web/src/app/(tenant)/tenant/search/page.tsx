@@ -1,8 +1,7 @@
-'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Search, MapPin, Filter, Bed } from 'lucide-react'
+import { Search, MapPin } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
@@ -109,7 +108,6 @@ export default function SearchPage() {
             <Link key={p.id} to={`/tenant/property/${p.id}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer p-0 overflow-hidden h-full">
                 {p.coverPhoto && (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={p.coverPhoto}
                     alt={p.name}

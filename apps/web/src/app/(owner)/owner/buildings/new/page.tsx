@@ -1,4 +1,3 @@
-'use client'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,15 +32,19 @@ const schema = z.object({
   contactPhone:     z.string().optional(),
 })
 
-type FormValues = z.infer<typeof schema>
+// z.coerce.number() means the form's raw input type (unknown, straight from
+// the <input>) differs from the parsed output type (number). Keeping both
+// apart is what lets useForm type the resolver correctly without a cast.
+type FormInput  = z.input<typeof schema>
+type FormValues = z.output<typeof schema>
 
 export default function NewBuildingPage() {
   const navigate = useNavigate()
   const { mutate: create, isPending } = useCreateBuilding()
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema) as any,
+  const { register, handleSubmit, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: { rentDueDay: 5, depositMonths: 2, totalFloors: 1 },
   })
 

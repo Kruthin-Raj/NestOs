@@ -1,8 +1,7 @@
-'use client'
 import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import {
-  Building2, Plus, MapPin, Bed, TrendingUp,
+  Building2, Plus, MapPin, Bed,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -11,7 +10,6 @@ import { PageHeader } from '@/components/shared/page-header'
 import { EmptyState } from '@/components/feedback/empty-state'
 import { CardSkeleton } from '@/components/feedback/loading-state'
 import { useBuildings } from '@/features/owner/buildings/hooks/use-buildings'
-import { formatRupees } from '@/lib/utils/format'
 import type { Building } from '@/types'
 
 export default function BuildingsPage() {
@@ -62,7 +60,6 @@ function BuildingCard({ building: b }: { building: Building }) {
     <Link to={`/owner/buildings/${b.id}`}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer h-full p-0 overflow-hidden">
         {b.photos?.[0] && (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={b.photos[0].fileUrl}
             alt={b.name}

@@ -1,13 +1,11 @@
-'use client'
 import { useNavigate } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { MapPin, Phone, Users, Wifi } from 'lucide-react'
+import { MapPin, Phone, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { StatusBadge } from '@/components/shared/status-badge'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { EmptyState } from '@/components/feedback/empty-state'
 import apiClient from '@/lib/api/client'
@@ -69,7 +67,6 @@ export default function PropertyDetailPage() {
       {/* Photos */}
       {property.photos?.length > 0 && (
         <div className="rounded-xl overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={property.photos[0].fileUrl}
             alt={property.name}

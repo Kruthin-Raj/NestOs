@@ -1,4 +1,3 @@
-'use client'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'

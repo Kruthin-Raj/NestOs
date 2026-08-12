@@ -1,15 +1,12 @@
-'use client'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  CreditCard, AlertCircle, Bell, Search, MapPin,
+  AlertCircle, Bell, Search, MapPin,
   ChevronRight, CheckCircle, Clock, XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
-import { StatusBadge } from '@/components/shared/status-badge'
 import { PageLoader } from '@/components/feedback/loading-state'
-import { EmptyState } from '@/components/feedback/empty-state'
 import { Badge } from '@/components/ui/badge'
 import apiClient from '@/lib/api/client'
 import { QUERY_KEYS } from '@/lib/utils/constants'
@@ -103,7 +100,6 @@ function SearchingDashboard({ data }: { data: Record<string, unknown> }) {
               <Link key={p.id} to={`/tenant/property/${p.id}`}>
                 <Card className="hover:shadow-md transition-shadow cursor-pointer p-0 overflow-hidden">
                   {p.coverPhoto && (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.coverPhoto} alt={p.name} className="w-full h-28 object-cover" />
                   )}
                   <div className="p-3">
@@ -145,7 +141,6 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
 
   const issues   = data.issues  as { open: number; recent: Array<{ id: string; title: string; status: string }> }
   const notices  = data.notices as { unreadCount: number; recent: Array<{ id: string; title: string; isRead: boolean }> }
-  const quickActions = data.quickActions as Array<{ label: string; action: string; amount?: number }>
 
   const RentStatusIcon = rent?.currentMonthStatus === 'SUCCESS'
     ? CheckCircle

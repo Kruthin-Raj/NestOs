@@ -1,4 +1,3 @@
-'use client'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
@@ -31,7 +30,7 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setLoading(true)
     try {
-      const result = await sendOtp(values.email)
+      await sendOtp(values.email)
       showToast('OTP sent to your email', 'success')
       navigate(
         `/verify-otp?email=${encodeURIComponent(values.email)}&redirect=${encodeURIComponent(redirect)}`

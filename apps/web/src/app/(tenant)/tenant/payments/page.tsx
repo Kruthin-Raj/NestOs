@@ -1,8 +1,6 @@
-'use client'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { CreditCard, Download } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { CreditCard } from 'lucide-react'
 import { Card, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { EmptyState } from '@/components/feedback/empty-state'
@@ -10,7 +8,6 @@ import { PageLoader } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
 import { QUERY_KEYS } from '@/lib/utils/constants'
 import { formatRupees, formatDateTime, formatBillingPeriod } from '@/lib/utils/format'
-import { showToast } from '@/components/ui/toaster'
 
 export default function TenantPaymentsPage() {
   const { data, isLoading } = useQuery({
@@ -21,34 +18,6 @@ export default function TenantPaymentsPage() {
     },
   })
 
-  const { mutate: createOrder, isPending } = useMutation({
-    mutationFn: async (bookingId: string) => {
-      const now = new Date()
-      const { data } = await apiClient.post('/payments/create-order', {
-        bookingId,
-        type:         'RENT',
-        billingMonth: now.getMonth() + 1,
-        billingYear:  now.getFullYear(),
-      })
-      return data.data
-    },
-    onSuccess: (orderData) => {
-      // Try to open UPI app via intent link (works on mobile)
-      if (orderData.upiIntentUrl) {
-        window.location.href = orderData.upiIntentUrl
-        showToast(
-          `Pay ${formatRupees(orderData.amountRupees)} to ${orderData.payeeName} via your UPI app. UPI ID: ${orderData.payeeUpiId}`,
-          'info'
-        )
-      } else {
-        showToast('Owner has not set up UPI yet. Please contact them.', 'error')
-      }
-    },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      showToast(msg ?? 'Could not initiate payment', 'error')
-    },
-  })
 
   if (isLoading) return <PageLoader />
 
