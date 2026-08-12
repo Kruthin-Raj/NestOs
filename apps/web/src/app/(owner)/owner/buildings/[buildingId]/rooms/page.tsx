@@ -1,5 +1,6 @@
 'use client'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,7 +24,7 @@ import { Link } from 'react-router-dom'
 import type { Room, Floor } from '@/types'
 
 export default function RoomsPage() {
-  const { buildingId }     = useParams<{ buildingId: string }>()
+  const buildingId         = useRequiredParam('buildingId')
   const [showAddRoom, setShowAddRoom] = useState(false)
   const [showAddFloor, setShowAddFloor] = useState(false)
 

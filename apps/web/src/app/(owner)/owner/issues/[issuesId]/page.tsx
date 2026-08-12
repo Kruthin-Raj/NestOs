@@ -1,5 +1,5 @@
 'use client'
-import { useParams } from 'react-router-dom'
+import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,7 +28,7 @@ const commentSchema = z.object({
 })
 
 export default function OwnerIssueDetailPage() {
-  const { issueId } = useParams<{ issueId: string }>()
+  const issueId = useRequiredParam('issueId')
   const qc          = useQueryClient()
 
   const { data: issue, isLoading } = useQuery({

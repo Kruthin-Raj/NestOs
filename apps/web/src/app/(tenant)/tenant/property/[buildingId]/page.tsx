@@ -1,5 +1,6 @@
 'use client'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { MapPin, Phone, Users, Wifi } from 'lucide-react'
@@ -16,7 +17,7 @@ import { QUERY_KEYS } from '@/lib/utils/constants'
 import { cn } from '@/lib/utils/cn'
 
 export default function PropertyDetailPage() {
-  const { buildingId } = useParams<{ buildingId: string }>()
+  const buildingId = useRequiredParam('buildingId')
   const navigate = useNavigate()
   const [selectedBed, setSelectedBed] = useState<{
     id: string; bedLabel: string; monthlyRent: number; roomNumber: string

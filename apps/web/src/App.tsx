@@ -22,6 +22,8 @@ import TenantPayments from './app/(tenant)/tenant/payments/page'
 import TenantIssues from './app/(tenant)/tenant/issues/page'
 import TenantIssueDetail from './app/(tenant)/tenant/issues/[issuesId]/page'
 import TenantOnboarding from './app/(tenant)/tenant/onboarding/page'
+import TenantNotices from './app/(tenant)/tenant/notices/page'
+import TenantSettings from './app/(tenant)/tenant/settings/page'
 
 // Owner Pages
 import OwnerDashboard from './app/(owner)/owner/dashboard/page'
@@ -34,6 +36,12 @@ import OwnerTenants from './app/(owner)/owner/tenants/page'
 import OwnerIssues from './app/(owner)/owner/issues/page'
 import OwnerIssueDetail from './app/(owner)/owner/issues/[issuesId]/page'
 import OwnerOnboarding from './app/(owner)/owner/onboarding/page'
+import OwnerPayments from './app/(owner)/owner/payments/page'
+import OwnerNotices from './app/(owner)/owner/notices/page'
+import OwnerSettings from './app/(owner)/owner/settings/page'
+
+// 404
+import NotFoundPage from './app/not-found'
 
 export default function App() {
   return (
@@ -59,7 +67,9 @@ export default function App() {
         <Route path="property/:buildingId" element={<TenantPropertyDetail />} />
         <Route path="payments" element={<TenantPayments />} />
         <Route path="issues" element={<TenantIssues />} />
-        <Route path="issues/:issuesId" element={<TenantIssueDetail />} />
+        <Route path="issues/:issueId" element={<TenantIssueDetail />} />
+        <Route path="notices" element={<TenantNotices />} />
+        <Route path="settings" element={<TenantSettings />} />
       </Route>
 
       {/* Owner Dashboard */}
@@ -74,8 +84,14 @@ export default function App() {
         <Route path="buildings/:buildingId/rooms/:roomId" element={<OwnerRoomDetail />} />
         <Route path="tenants" element={<OwnerTenants />} />
         <Route path="issues" element={<OwnerIssues />} />
-        <Route path="issues/:issuesId" element={<OwnerIssueDetail />} />
+        <Route path="issues/:issueId" element={<OwnerIssueDetail />} />
+        <Route path="payments" element={<OwnerPayments />} />
+        <Route path="notices" element={<OwnerNotices />} />
+        <Route path="settings" element={<OwnerSettings />} />
       </Route>
+
+      {/* Catch-all */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

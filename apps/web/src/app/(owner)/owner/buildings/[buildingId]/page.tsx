@@ -1,6 +1,7 @@
 'use client'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
+import { useRequiredParam } from '@/lib/utils/use-required-param'
 import {
   MapPin, Bed, Users, CreditCard, Plus,
   Settings, ToggleLeft, ToggleRight, ChevronRight,
@@ -19,7 +20,7 @@ import { formatRupees } from '@/lib/utils/format'
 import type { Floor } from '@/types'
 
 export default function BuildingDetailPage() {
-  const { buildingId }  = useParams<{ buildingId: string }>()
+  const buildingId      = useRequiredParam('buildingId')
   const navigate = useNavigate()
   const { data: building, isLoading } = useBuilding(buildingId)
   const { mutate: updateStatus, isPending } = useUpdateBuildingStatus()

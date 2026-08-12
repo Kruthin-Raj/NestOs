@@ -1,5 +1,5 @@
 'use client'
-import { useParams } from 'react-router-dom'
+import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -27,7 +27,8 @@ const addBedSchema = z.object({
 })
 
 export default function RoomDetailPage() {
-  const { buildingId, roomId } = useParams<{ buildingId: string; roomId: string }>()
+  const buildingId = useRequiredParam('buildingId')
+  const roomId     = useRequiredParam('roomId')
   const [showAddBed, setShowAddBed] = useState(false)
   const [releasingBedId, setReleasingBedId] = useState<string | null>(null)
   const qc = useQueryClient()
