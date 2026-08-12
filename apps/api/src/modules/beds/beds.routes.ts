@@ -3,12 +3,32 @@ import { z } from 'zod'
 import { authenticate } from '@middleware/auth.middleware'
 import { requireVerifiedOwner } from '@middleware/rbac.middleware'
 import { validate } from '@middleware/validate.middleware'
-import { getBeds, createBed, updateBed, assignBed, releaseBed } from './beds.controller'
+import { asyncHandler } from '@utils/async-handler'
+import { sendSuccess } from '@utils/response.util'
+import {
+  getBedsService,
+  createBedService,
+  updateBedService,
+  assignBedService,
+  releaseBedService,
+} from './beds.service'
+
+type RoomParams = { buildingId: string; roomId: string }
+type BedParams  = { buildingId: string; roomId: string; bedId: string }
 
 export const bedsRouter: ReturnType<typeof Router> = Router()
 bedsRouter.use(authenticate, requireVerifiedOwner)
 
-bedsRouter.get('/:buildingId/rooms/:roomId/beds', getBeds)
+bedsRouter.get('/:buildingId/rooms/:roomId/beds',
+  asyncHandler<RoomParams>(async (req, res) => {
+    const r = await getBedsService(
+      req.params.buildingId,
+      req.params.roomId,
+      req.resourceOwnerId!
+    )
+    sendSuccess(res, 'Beds fetched', r)
+  })
+)
 
 bedsRouter.post('/:buildingId/rooms/:roomId/beds',
   validate(z.object({
@@ -16,7 +36,15 @@ bedsRouter.post('/:buildingId/rooms/:roomId/beds',
     monthlyRent: z.number().positive().min(500),
     notes:       z.string().max(500).optional(),
   })),
-  createBed
+  asyncHandler<RoomParams>(async (req, res) => {
+    const r = await createBedService(
+      req.params.buildingId,
+      req.params.roomId,
+      req.resourceOwnerId!,
+      req.body
+    )
+    sendSuccess(res, 'Bed created', r, 201)
+  })
 )
 
 bedsRouter.patch('/:buildingId/rooms/:roomId/beds/:bedId',
@@ -25,7 +53,16 @@ bedsRouter.patch('/:buildingId/rooms/:roomId/beds/:bedId',
     notes:       z.string().max(500).optional(),
     status:      z.enum(['VACANT', 'BLOCKED']).optional(),
   })),
-  updateBed
+  asyncHandler<BedParams>(async (req, res) => {
+    const r = await updateBedService(
+      req.params.buildingId,
+      req.params.roomId,
+      req.params.bedId,
+      req.resourceOwnerId!,
+      req.body
+    )
+    sendSuccess(res, 'Bed updated', r)
+  })
 )
 
 bedsRouter.patch('/:buildingId/rooms/:roomId/beds/:bedId/assign',
@@ -35,7 +72,16 @@ bedsRouter.patch('/:buildingId/rooms/:roomId/beds/:bedId/assign',
     monthlyRent:   z.number().positive(),
     depositAmount: z.number().min(0),
   })),
-  assignBed
+  asyncHandler<BedParams>(async (req, res) => {
+    const r = await assignBedService(
+      req.params.buildingId,
+      req.params.roomId,
+      req.params.bedId,
+      req.resourceOwnerId!,
+      req.body
+    )
+    sendSuccess(res, 'Bed assigned', r)
+  })
 )
 
 bedsRouter.post('/:buildingId/rooms/:roomId/beds/:bedId/release',
@@ -43,5 +89,14 @@ bedsRouter.post('/:buildingId/rooms/:roomId/beds/:bedId/release',
     actualMoveOutDate: z.string(),
     notes:             z.string().max(500).optional(),
   })),
-  releaseBed
+  asyncHandler<BedParams>(async (req, res) => {
+    const r = await releaseBedService(
+      req.params.buildingId,
+      req.params.roomId,
+      req.params.bedId,
+      req.resourceOwnerId!,
+      req.body
+    )
+    sendSuccess(res, 'Bed released', r)
+  })
 )
