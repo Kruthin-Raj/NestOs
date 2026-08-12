@@ -1,7 +1,6 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -10,10 +9,9 @@ import { FormField } from '@/components/ui/form-field'
 import { Card, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
-import { useMe } from '@/features/auth/hooks/use-auth'
+import { useMe, useUpdateProfile, useUpdatePreferences } from '@/features/auth/hooks/use-auth'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
-import { QUERY_KEYS } from '@/lib/utils/constants'
 
 const profileSchema = z.object({
   fullName:          z.string().min(2),
@@ -37,7 +35,6 @@ const prefsSchema = z.object({
 
 export default function TenantSettingsPage() {
   const { data: user } = useMe()
-  const qc = useQueryClient()
   const profile = user?.tenantProfile
 
   const { register: regProfile, handleSubmit: subProfile, formState: { errors: errProfile } } = useForm({
@@ -51,20 +48,8 @@ export default function TenantSettingsPage() {
     resolver: zodResolver(prefsSchema),
   })
 
-  const { mutate: saveProfile, isPending: savingProfile } = useMutation({
-    mutationFn: (v: unknown) => apiClient.patch('/users/profile', v),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.auth.me() })
-      showToast('Profile updated', 'success')
-    },
-  })
-
-  const { mutate: savePrefs, isPending: savingPrefs } = useMutation({
-    mutationFn: (v: unknown) => apiClient.patch('/users/preferences', v),
-    onSuccess:  () => {
-      showToast('Preferences updated', 'success')
-    },
-  })
+  const { mutate: saveProfile, isPending: savingProfile } = useUpdateProfile()
+  const { mutate: savePrefs,   isPending: savingPrefs   } = useUpdatePreferences()
 
   return (
     <div className="max-w-xl space-y-6">

@@ -1,17 +1,13 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
-import { useMe } from '@/features/auth/hooks/use-auth'
-import apiClient from '@/lib/api/client'
-import { showToast } from '@/components/ui/toaster'
-import { QUERY_KEYS } from '@/lib/utils/constants'
+import { useMe, useUpdateProfile } from '@/features/auth/hooks/use-auth'
 
 const schema = z.object({
   fullName:     z.string().min(2),
@@ -24,7 +20,6 @@ type FormValues = z.infer<typeof schema>
 
 export default function OwnerSettingsPage() {
   const { data: user } = useMe()
-  const qc = useQueryClient()
   const profile = user?.ownerProfile
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
@@ -35,14 +30,7 @@ export default function OwnerSettingsPage() {
     },
   })
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: (v: FormValues) => apiClient.patch('/users/profile', v),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.auth.me() })
-      showToast('Profile updated', 'success')
-    },
-    onError: () => showToast('Update failed', 'error'),
-  })
+  const { mutate, isPending } = useUpdateProfile()
 
   return (
     <div className="max-w-xl space-y-6">
