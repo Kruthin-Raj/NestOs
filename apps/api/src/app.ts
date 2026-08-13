@@ -15,7 +15,7 @@ import { authRouter } from '@modules/auth/auth.routes'
 import { usersRouter } from '@modules/users/users.routes'
 import { uploadsRouter } from '@modules/uploads/uploads.routes'
 import { ownerVerificationRouter } from '@modules/owner-verification/owner-verification.routes'
-import { buildingsRouter } from '@modules/buildings/buildings.routes'
+import { buildingsRouter, publicBuildingsRouter } from '@modules/buildings/buildings.routes'
 import { floorsRouter } from '@modules/floors/floors.routes'
 import { roomsRouter } from '@modules/rooms/rooms.routes'
 import { bedsRouter } from '@modules/beds/beds.routes'
@@ -23,7 +23,7 @@ import { tenantsRouter } from '@modules/tenants/tenants.routes'
 import { bookingsRouter } from '@modules/bookings/bookings.routes'
 import { paymentsRouter } from '@modules/payments/payments.routes'
 import { issuesRouter } from '@modules/issues/issues.routes'
-import { noticesRouter } from '@modules/notices/notices.routes'
+import { ownerNoticesRouter, tenantNoticesRouter } from '@modules/notices/notices.routes'
 import { dashboardRouter } from '@modules/dashboard/dashboard.routes'
 import { adminRouter } from '@modules/admin/admin.routes'
 
@@ -84,6 +84,10 @@ export function createApp(): Application {
   app.use(`${API_PREFIX}/users`,             usersRouter)
   app.use(`${API_PREFIX}/uploads`,           uploadsRouter)
   app.use(`${API_PREFIX}/owner/verification`,ownerVerificationRouter)
+  // Public building routes MUST be mounted before buildingsRouter: the latter
+  // guards everything with requireVerifiedOwner and defines '/:buildingId',
+  // which would otherwise match '/search' first.
+  app.use(`${API_PREFIX}/buildings`,         publicBuildingsRouter)
   app.use(`${API_PREFIX}/buildings`,         buildingsRouter)
   app.use(`${API_PREFIX}/buildings`,         floorsRouter)   // /buildings/:id/floors
   app.use(`${API_PREFIX}/buildings`,         roomsRouter)    // /buildings/:id/rooms
@@ -92,8 +96,8 @@ export function createApp(): Application {
   app.use(`${API_PREFIX}/bookings`,          bookingsRouter)
   app.use(`${API_PREFIX}/payments`,          paymentsRouter)
   app.use(`${API_PREFIX}/issues`,            issuesRouter)
-  app.use(`${API_PREFIX}/owner/notices`,     noticesRouter)
-  app.use(`${API_PREFIX}/tenant/notices`,    noticesRouter)
+  app.use(`${API_PREFIX}/owner/notices`,     ownerNoticesRouter)
+  app.use(`${API_PREFIX}/tenant/notices`,    tenantNoticesRouter)
   app.use(`${API_PREFIX}/owner/dashboard`,   dashboardRouter)
   app.use(`${API_PREFIX}/tenant/dashboard`,  dashboardRouter)
   app.use(`${API_PREFIX}/admin`,             adminRouter)
