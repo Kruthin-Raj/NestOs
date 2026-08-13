@@ -1,14 +1,27 @@
-# Cleanup & Refactor — What Changed and What I Found
+# Cleanup, Refactor & Fixes — What Changed and What I Found
 
-Branch: `chore/cleanup-vite-migration` → `main` · 18 commits · 98 files changed
-(+2,694 / −10,079) · 25 deleted, 31 renamed, 7 added
+Two stacked branches. **Merge them in this order:**
 
-This document exists so reviewers don't have to reverse-engineer the branch. It covers
-what was broken before, what I changed, what I found and deliberately left alone, and
-exactly how far the verification goes.
+| Order | Branch | Base | Commits | Scope |
+|---|---|---|---|---|
+| 1 | `chore/cleanup-vite-migration` | `main` | 19 | Unblock both apps, remove Next.js debris, delete the controller layer, flatten the web tree |
+| 2 | `fix/known-issues` | `chore/cleanup-vite-migration` | 8 | Fix the 8 issues branch 1 documented, add uploads and the admin UI |
 
-**Nothing in any `*.service.ts` was modified.** All business logic is byte-for-byte
-unchanged. The branch touches the HTTP layer, the frontend file layout, dead code, and docs.
+Branch 1: 98 files changed (+2,694 / −10,079) · 25 deleted, 31 renamed, 7 added.
+Branch 2: 18 files changed (+1,301 / −205) · 3 added.
+
+This document exists so reviewers don't have to reverse-engineer either branch. It covers
+what was broken before, what changed, what was deliberately left alone, and exactly how far
+the verification goes.
+
+**Branch 1 modifies no `*.service.ts` at all** — business logic is byte-for-byte unchanged;
+it touches the HTTP layer, the frontend file layout, dead code, and docs. **Branch 2 does
+change behaviour** — that is its purpose — and is covered in
+[Branch 2](#branch-2--fixknown-issues).
+
+---
+
+# Branch 1 — `chore/cleanup-vite-migration`
 
 ---
 
@@ -148,11 +161,13 @@ intent URL opens the tenant's own UPI app prefilled with the owner's VPA and amo
 
 ---
 
-## 4. Found and deliberately NOT fixed
+## 4. Found and deliberately NOT fixed *(in branch 1)*
 
-A refactor must not silently change behaviour, so these are preserved exactly as they were,
-with an explanatory comment at each site. They are documented in the README's Known Issues
-so nobody re-files them. **Triaged — they are not equally urgent.**
+A refactor must not silently change behaviour, so these are preserved exactly as they were
+in branch 1, with an explanatory comment at each site. **All of F1–F8 are fixed in branch 2**
+— see [Branch 2](#branch-2--fixknown-issues). They are listed here because the reasoning for
+leaving them alone is what makes branch 1 reviewable in isolation. **Triaged — they were not
+equally urgent.**
 
 ### Broken now — these features do not work
 
@@ -252,7 +267,7 @@ Next.js app that no longer exists. It now covers:
 
 ---
 
-## 7. Reviewer notes
+## 7. Reviewer notes *(branch 1)*
 
 - Read the commits in order; each is scoped to one concern and explains its reasoning.
   The Phase 3 commits are mechanical and near-identical — reviewing one or two carefully is
@@ -277,3 +292,177 @@ carrying this project. Prisma's whole value is its generated types across a 15-m
 schema; Zod schemas already double as runtime validation and static types on both sides;
 `tsc --noEmit` is the API's only automated check. In plain JS, the four bugs above that
 were caught at compile time would instead have been runtime `undefined`s in production.
+
+---
+
+# Branch 2 — `fix/known-issues`
+
+**Base:** `chore/cleanup-vite-migration` (not `main`) · 8 commits · 18 files changed
+(+1,301 / −205)
+
+Branch 1 deliberately left every behavioural bug in place and documented it. This branch
+fixes all of them, then adds the two things missing to make the app usable end to end:
+working file uploads and an admin UI.
+
+Unlike branch 1, **this branch changes behaviour on purpose.** Verification is
+correspondingly heavier — everything below was exercised against a real PostgreSQL with
+real login cookies, not just status-code probing.
+
+## 8. Branch 2 — what was fixed
+
+| # | Issue | Fix |
+|---|---|---|
+| **F1** | Notices 404'd for both roles: one router held `/owner` and `/tenant` paths and was mounted at *both* `/owner/notices` and `/tenant/notices`, so real URLs came out as `/owner/notices/owner`. | Split into `ownerNoticesRouter` and `tenantNoticesRouter` with paths relative to their mount — which is what the web client already called. **No frontend change needed.** |
+| **F2** | `GET /buildings/search` was registered after `/:buildingId`, which matched first. | Moved to a router mounted ahead of it. |
+| **F3** | `/search` and `/:buildingId/public` sat on a router with a blanket `requireVerifiedOwner`, so tenants could not search or view properties. | Both moved to `publicBuildingsRouter`, mounted at the same prefix but before `buildingsRouter`. |
+| **F4** | `POST /auth/refresh-token` was a `501` stub while the axios interceptor called it on every 401, so any expired token logged the user out. | Implemented with single-use rotation. |
+| **F5** | Uploads returned `501`; owner verification could never be completed. | Implemented: `presigned-url` then `PUT raw` then `confirm`. |
+| **F6** | `app.ts` served the whole `UPLOAD_DIR` via unauthenticated `express.static` — every Aadhaar/PAN/selfie readable by anyone who guessed a filename. | Mount removed. Reads go through an authorized endpoint. |
+| **F7** | `pnpm start` crashed: `tsc` does not rewrite path aliases, so `dist/index.js` did `require("@config/env")`. | Added `tsc-alias` to the build. |
+| **F8** | `EMAIL_FROM` defaulted to a personal Gmail address. | Now required; the process refuses to boot without it. |
+
+### Three more bugs found while fixing those
+
+- **Logout never cleared the refresh cookie.** It is set with `path=/api/v1/auth` but was
+  cleared with `path=/`. Clearing only works when the path matches, so the browser kept
+  sending it. Added `clearRefreshTokenCookieOptions`.
+- **Logout never revoked anything server-side.** It did not touch the database, so a
+  refresh token captured before logout stayed valid for its full 7 days. Now revoked.
+- **`resend` was a dead dependency.** Nothing imported it — mail goes out over SMTP via
+  nodemailer — so `RESEND_API_KEY` was dead config, which is why a placeholder value there
+  never caused a visible failure. Both removed.
+
+### And one bug introduced by this branch, then fixed
+
+Adding the admin route exposed that the post-login redirect only branched on `OWNER`, so a
+`SUPER_ADMIN` fell into the `else` and landed on `/tenant/dashboard` — where every call
+403s and there is no link to `/admin`. Fixed in `f646176`; login now routes by role.
+
+## 9. New: document uploads
+
+There is no object store, so the "presigned URL" points back at this API and carries a
+short-lived signed token:
+
+```
+POST /uploads/presigned-url  -> { uploadUrl, fileKey, expiresInSeconds }
+PUT  <uploadUrl>             raw body; no cookie — the token authorizes
+POST /uploads/confirm        -> creates the Owner/TenantDocument row
+GET  /uploads/documents/:id  -> authorized read (replaces the static mount)
+```
+
+Security properties, each individually verified:
+
+- **The destination path comes from the signed token**, never from a request field. That is
+  what makes the `PUT` safe without a session cookie — the browser's `fetch()` sends none.
+- `fileKey` must match a strict pattern *and* resolve inside `UPLOAD_DIR`.
+- `confirm` re-checks that the `fileKey` sits under the caller's own prefix, so one user
+  cannot attach another user's document to themselves.
+- The size cap is enforced **while streaming**, not only against the `Content-Length` header
+  a client can lie about; a partial file is deleted on abort.
+- `Content-Type` must match the type the link was issued for.
+- Documents are served as attachments with `Cache-Control: no-store, private`.
+- Uploads are recorded in `audit_logs` as `DOCUMENT_UPLOADED` with the document type only —
+  no file key, name, or contents.
+
+The upload URL is **absolute** on purpose: the browser calls it with `fetch()` from the web
+origin, so a relative path would hit the Vite dev server instead of the API.
+
+## 10. New: admin UI
+
+There was no admin UI at all, so owner approval — the gate unlocking every owner route —
+could only be done by calling the API by hand or editing the database. The owner flow was
+untestable end to end.
+
+`/admin/owners` lists owners `UNDER_REVIEW` with their documents and allows approve (with
+notes) or reject (reason, min 10 chars, shown to the owner).
+
+- `AdminLayout` redirects non-admins to their own dashboard. **This is convenience, not a
+  security boundary** — every `/admin` route is guarded server-side by `isAdmin`, verified
+  to return 403 for an owner.
+- Documents are fetched through the authorized endpoint with the session cookie and handed
+  to the browser as a blob, rather than linked. They are not on a public URL any more, and a
+  cross-origin `<a href>` would not carry credentials under a strict SameSite policy.
+- `pnpm admin:create <email>` added, because self-signup is restricted to `OWNER`/`TENANT`
+  in `auth.validation.ts` by design. It refuses to change the role of an existing account
+  rather than orphaning an owner/tenant profile from its role.
+
+## 11. Verification — against a real database
+
+Docker Postgres, schema pushed, seeded, exercised over HTTP with real cookies.
+
+**Auth (F4)**
+```
+login -> refresh                      200, new refresh token issued
+reuse the OLD refresh token           401  (single-use enforced)
+new access token still works          200
+logout                                200
+refresh after logout                  401  (revoked server-side)
+refresh_tokens table                  2 revoked, 0 live
+```
+
+**Uploads (F5/F6)**
+```
+presigned -> PUT -> confirm -> read   200 each
+read as a different user              403
+read with no cookie                   401
+read as SUPER_ADMIN (review)          200
+confirm another user's fileKey        403
+path-traversal fileKey                400
+expired / garbage upload token        401
+oversize via Content-Length           400
+oversize via chunked (streaming cap)  400, no partial file left behind
+old public /uploads/<key> path        404
+```
+
+**Routing (F1/F2/F3)**
+```
+GET  /tenant/notices                  200   (was 404)
+GET  /tenant/notices/tenant           404   (old broken URL, gone)
+GET  /owner/notices as verified owner 200   (was 404)
+GET  /owner/notices with tenant token 403   (route exists, role guard fires)
+GET  /buildings/search as tenant      200   (was 401)
+GET  /buildings/search anonymous      200
+GET  /buildings as owner              200   (owner routes still guarded)
+```
+
+**Admin (section 10)**
+```
+pnpm admin:create                     creates the admin
+... on an existing OWNER              refuses, exits non-zero
+GET  /admin/owners/pending as admin   200, shape matches the UI
+POST .../reject with a short reason   422  (validation holds)
+POST .../approve                      200, owner becomes VERIFIED
+GET  /admin/owners/pending as owner   403
+owner dashboard after approval        200  (the gate actually lifts)
+```
+
+**Build (F7/F8)**
+```
+dist/app.js emits relative requires   (no @config/... left)
+dist loads and createApp() runs       pnpm start is fixed
+booting without EMAIL_FROM            exits naming the variable
+```
+
+Plus, on both branches: API type check, API build, web lint (0 errors), web build.
+
+### What is still NOT verified
+
+- **No automated tests.** Tests were skipped by request, so none of the above is guarded
+  against regression. Every check listed was run by hand.
+- **No browser click-through.** The admin screen, the upload UI and the payment flow were
+  verified at the API contract level, not at the rendering level. The UPI intent link only
+  opens an app on mobile.
+- The throwaway database was seeded, not production-shaped; nothing here exercises scale.
+
+## 12. Reviewer notes (branch 2)
+
+- Read the commits in order — each is scoped and explains its reasoning.
+- The riskiest files are `uploads.service.ts` (new, handles PII) and `auth.service.ts`
+  (`refreshTokensService` / `logoutService`). Both are worth reading closely.
+- `refresh_tokens.tokenHash` stores **bcrypt** of a uuid, so a row cannot be looked up by
+  hash. The implementation loads the user's live tokens and compares — expired and revoked
+  rows are filtered out in SQL first. The storage format is unchanged, so existing sessions
+  keep working.
+- **Do not reintroduce a static mount for `UPLOAD_DIR`.** That was F6.
+- Suggested next: a test harness covering auth rotation and upload authorization — the two
+  places where a silent regression would be most expensive.
