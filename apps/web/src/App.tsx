@@ -41,6 +41,10 @@ import OwnerNotices from '@/pages/owner/Notices'
 import OwnerSettings from '@/pages/owner/Settings'
 import OwnerOnboarding from '@/pages/owner/Onboarding'
 
+// Admin
+import AdminLayout from '@/layouts/AdminLayout'
+import AdminPendingOwners from '@/pages/admin/PendingOwners'
+
 export default function App() {
   return (
     <Routes>
@@ -86,6 +90,12 @@ export default function App() {
         <Route path="payments" element={<OwnerPayments />} />
         <Route path="notices" element={<OwnerNotices />} />
         <Route path="settings" element={<OwnerSettings />} />
+      </Route>
+
+      {/* Admin — SUPER_ADMIN only. AdminLayout redirects everyone else. */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="owners" replace />} />
+        <Route path="owners" element={<AdminPendingOwners />} />
       </Route>
 
       {/* Catch-all */}
