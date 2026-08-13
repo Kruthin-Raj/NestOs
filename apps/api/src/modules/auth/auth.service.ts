@@ -257,3 +257,126 @@ export async function getCurrentUserService(userId: string) {
   if (!user) throw new NotFoundError('User not found')
   return user
 }
+// ─────────────────────────────────────────────────────────────
+// refreshTokens — rotates the refresh token and issues a new access token
+//
+// Storage note: verifyOtpService stores bcrypt(tokenId) in
+// refresh_tokens.tokenHash, and the JWT carries the plaintext tokenId. bcrypt
+// salts per hash, so the row cannot be looked up by hash — we load the user's
+// live tokens and compare. A user has at most a handful, and expired/revoked
+// rows are filtered out in SQL first.
+//
+// Rotation is single-use: the presented token is revoked as it is exchanged, so
+// a captured refresh token stops working the moment the real client refreshes.
+// ─────────────────────────────────────────────────────────────
+export async function refreshTokensService(refreshTokenCookie: string | undefined) {
+  if (!refreshTokenCookie) {
+    throw new UnauthorizedError('No refresh token provided. Please log in.', 'NO_REFRESH_TOKEN')
+  }
+
+  // Throws UnauthorizedError on an expired or tampered token.
+  const payload = verifyRefreshToken(refreshTokenCookie)
+
+  const candidates = await prisma.refreshToken.findMany({
+    where: {
+      userId:    payload.userId,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  let matched: (typeof candidates)[number] | undefined
+  for (const row of candidates) {
+    if (await bcrypt.compare(payload.tokenId, row.tokenHash)) {
+      matched = row
+      break
+    }
+  }
+
+  if (!matched) {
+    // Valid signature but no live row: already rotated, revoked by logout, or
+    // replayed. Treat as a dead session rather than issuing new tokens.
+    throw new UnauthorizedError('Session expired. Please log in again.', 'REFRESH_TOKEN_REVOKED')
+  }
+
+  const user = await prisma.user.findUnique({
+    where:  { id: payload.userId, isActive: true, deletedAt: null },
+    select: { id: true, email: true, role: true, isEmailVerified: true },
+  })
+
+  if (!user) {
+    await prisma.refreshToken.update({
+      where: { id: matched.id },
+      data:  { revokedAt: new Date() },
+    })
+    throw new UnauthorizedError('Account is no longer active.', 'ACCOUNT_INACTIVE')
+  }
+
+  const newTokenId   = uuidv4()
+  const newTokenHash = await bcrypt.hash(newTokenId, 10)
+  const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // Revoke the presented token and issue its replacement atomically, so a
+  // failure cannot leave the caller with two live tokens or none.
+  await prisma.$transaction([
+    prisma.refreshToken.update({
+      where: { id: matched.id },
+      data:  { revokedAt: new Date() },
+    }),
+    prisma.refreshToken.create({
+      data: { userId: user.id, tokenHash: newTokenHash, expiresAt: refreshExpiresAt },
+    }),
+  ])
+
+  const accessToken = signAccessToken({
+    userId: user.id,
+    role:   user.role,
+    email:  user.email,
+  })
+
+  const refreshToken = signRefreshToken({ userId: user.id, tokenId: newTokenId })
+
+  return {
+    user: {
+      id:              user.id,
+      email:           user.email,
+      role:            user.role,
+      isEmailVerified: user.isEmailVerified,
+    },
+    accessToken,
+    refreshToken,
+    expiresIn: 900,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// logout — revokes the refresh token server-side.
+//
+// Clearing the cookie alone left the token valid for its full 7 days, so a
+// copy taken before logout still worked. Best-effort by design: a malformed or
+// already-revoked token must not stop the user from logging out.
+// ─────────────────────────────────────────────────────────────
+export async function logoutService(refreshTokenCookie: string | undefined): Promise<void> {
+  if (!refreshTokenCookie) return
+
+  try {
+    const payload = verifyRefreshToken(refreshTokenCookie)
+
+    const candidates = await prisma.refreshToken.findMany({
+      where: { userId: payload.userId, revokedAt: null },
+    })
+
+    for (const row of candidates) {
+      if (await bcrypt.compare(payload.tokenId, row.tokenHash)) {
+        await prisma.refreshToken.update({
+          where: { id: row.id },
+          data:  { revokedAt: new Date() },
+        })
+        break
+      }
+    }
+  } catch (err) {
+    logger.warn('Logout could not revoke the refresh token', 'AuthService', err)
+  }
+}

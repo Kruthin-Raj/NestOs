@@ -82,6 +82,8 @@ export function getRefreshTokenCookieOptions() {
   }
 }
 
+// Clearing a cookie only works when the path matches the one it was set with.
+// The access cookie uses '/', so this is correct for it.
 export function clearTokenCookieOptions() {
   return {
     httpOnly: true,
@@ -89,5 +91,18 @@ export function clearTokenCookieOptions() {
     sameSite: (env.isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
     maxAge: 0,
     path: '/',
+  }
+}
+
+// The refresh cookie is scoped to '/api/v1/auth' (see
+// getRefreshTokenCookieOptions), so clearing it with path '/' silently did
+// nothing and the browser kept sending it after logout.
+export function clearRefreshTokenCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: env.isProduction,
+    sameSite: (env.isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+    maxAge: 0,
+    path: '/api/v1/auth',
   }
 }
