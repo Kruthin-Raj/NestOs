@@ -1,5 +1,4 @@
 import express, { Application } from 'express'
-import path from 'path'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -47,8 +46,14 @@ export function createApp(): Application {
   app.use(express.json({ limit: '10mb' }))
   app.use(express.urlencoded({ extended: true }))
 
-  // ── Serve uploaded files statically ─────────────────────
-  app.use('/uploads', express.static(path.resolve(env.UPLOAD_DIR)))
+  // ── Uploaded files are NOT served statically ─────────────
+  // They are Aadhaar/PAN/selfie documents. This used to be
+  //   app.use('/uploads', express.static(path.resolve(env.UPLOAD_DIR)))
+  // which exposed every document to anyone who guessed a filename, with no
+  // authentication whatsoever. Reads now go through
+  // GET /api/v1/uploads/documents/:documentId, which checks that the caller
+  // owns the document (or is an admin reviewing verification).
+  // Do not reintroduce a static mount here.
 
   // ── Cookie parser ─────────────────────────────────────────
   app.use(cookieParser())
