@@ -269,6 +269,7 @@ for `{"status":"ok",...}`.
 | `pnpm lint` | web | ESLint — must be 0 errors |
 | `pnpm build` | both | Type check + compile |
 | `pnpm db:studio` | api | Browse the database in a GUI |
+| `pnpm admin:create <email>` | api | Create a SUPER_ADMIN (cannot be done via signup) |
 
 There is **no test suite yet.** `pnpm lint` and `pnpm build` are the only automated
 checks, so run both before pushing.
@@ -305,11 +306,22 @@ reach the dashboard until it's approved. The full path is:
 1. Owner signs up and uploads documents on the onboarding page — Aadhaar front + back, a
    selfie, and at least one property document (all four are required).
 2. Owner submits, which moves them to `UNDER_REVIEW`.
-3. A `SUPER_ADMIN` approves via `POST /api/v1/admin/owners/:ownerProfileId/approve`.
+3. A `SUPER_ADMIN` reviews them at **`/admin/owners`** and approves or rejects.
 
-**There is no admin UI yet**, so step 3 means calling the API as the seeded admin
-(`admin@nestos.in`, created by `pnpm db:seed`). To skip it while developing, open
-`pnpm db:studio` and set `owner_profiles.verificationStatus` to `VERIFIED` directly.
+Admins cannot sign up — `auth.validation.ts` restricts self-signup to `OWNER` and
+`TENANT`. Create one with:
+
+```bash
+cd apps/api
+pnpm admin:create you@example.com     # or use the seeded admin@nestos.in
+```
+
+Then sign in at `/login` with that address and open `/admin`. Login is OTP-by-email
+either way, so use an address you can receive mail at — or read the code from the API
+console in development.
+
+To skip the whole gate while developing, open `pnpm db:studio` and set
+`owner_profiles.verificationStatus` to `VERIFIED` directly.
 
 ## Known issues
 
@@ -321,8 +333,8 @@ Actively under development. Check here before assuming something you wrote is br
 |---|---|
 | 9 | No shared types package — `apps/web/src/types/index.ts` mirrors the Prisma schema by hand and will drift. |
 | 10 | No tests and no CI. `pnpm lint` and `pnpm build` are the only automated checks. |
-| 11 | No admin UI. Owner approval/rejection is API-only (see above). |
-| 12 | `dashboardRouter` is mounted at both `/owner/dashboard` and `/tenant/dashboard` while defining `/owner` and `/tenant` paths, so the real URLs double up (`/owner/dashboard/owner`). It works and the frontend matches, but it reads oddly — this is the same shape that made notices 404 before it was fixed. |
+| 11 | `dashboardRouter` is mounted at both `/owner/dashboard` and `/tenant/dashboard` while defining `/owner` and `/tenant` paths, so the real URLs double up (`/owner/dashboard/owner`). It works and the frontend matches, but it reads oddly — this is the same shape that made notices 404 before it was fixed. |
+| 12 | The admin UI covers owner verification only. There is no user management, and rejected owners can resubmit only by re-uploading documents. |
 
 ### Fixed
 
