@@ -8,8 +8,9 @@ property owners and tenants.
 > a Next.js app, read [What changed in the cleanup](#what-changed-in-the-cleanup) — files moved.
 >
 > **Just want it running?** [Getting Started](#getting-started), then
+> [Accounts and passwords](#accounts-and-passwords) and
 > [Getting an owner verified](#getting-an-owner-verified) — the owner dashboard is gated
-> behind approval and that trips everyone up once.
+> behind approval, and that trips everyone up once.
 
 ## Tech Stack
 
@@ -44,9 +45,13 @@ apps/api  (Express, port 4000)
 PostgreSQL (Supabase)
 ```
 
-**Auth is cookie-based.** Login sets two httpOnly cookies (`nestos_token`,
-`nestos_refresh`). The browser sends them automatically because axios sets
-`withCredentials: true` and the API sets `cors({ credentials: true })`.
+**Auth is email + password, over cookies.** Signing in sets two httpOnly cookies
+(`nestos_token`, `nestos_refresh`). The browser sends them automatically because axios
+sets `withCredentials: true` and the API sets `cors({ credentials: true })`.
+
+A one-time code is used for exactly two things: confirming the address at signup, and
+authorising a password reset. It is not a way to log in. See
+[Accounts and passwords](#accounts-and-passwords).
 
 This is why `FRONTEND_URL` in `apps/api/.env` **must exactly match** the origin the web
 app runs on. A mismatch means the browser drops every request, which looks like a broken
@@ -167,7 +172,17 @@ payment stays `PENDING` forever.
 The intent URL is built by `buildUpiIntentUrl` in `apps/api/src/modules/payments/`. Owners
 must have set a UPI ID or `create-order` fails with a clear message.
 
-Deposits use the same flow, triggered from the property detail page at booking time.
+Deposits use the same flow, and confirming one is what completes a booking: the booking
+becomes `CONFIRMED`, the bed `OCCUPIED` and the tenant `ACTIVE`. Until then the booking
+stays `PENDING` with the bed held. A tenant pays the deposit from **`/tenant/bookings`**;
+rent is only payable once the booking is confirmed.
+
+Owners confirm payments at **`/owner/payments`**, where each pending payment shows the
+tenant's UPI reference.
+
+Booking has three gates in order: the tenant's ID must be verified, their profile at least
+70% complete, and the bed vacant. A tenant with an active booking must cancel it before
+making another.
 
 ---
 
@@ -240,6 +255,11 @@ pnpm db:push
 
 *(Optional) seed some data: `pnpm db:seed`*
 
+Re-run `pnpm db:generate && pnpm db:push` after pulling changes that touch
+`schema.prisma` — otherwise the generated client asks for columns the database does not
+have, and every query touching that table fails with a confusing
+`column "(not available)" does not exist`.
+
 `prisma generate` reads `DATABASE_URL` from `.env`, so step 2 must be done first — even
 though generating the client makes no database connection.
 
@@ -270,6 +290,7 @@ for `{"status":"ok",...}`.
 | `pnpm build` | both | Type check + compile |
 | `pnpm db:studio` | api | Browse the database in a GUI |
 | `pnpm admin:create <email>` | api | Create a SUPER_ADMIN (cannot be done via signup) |
+| `pnpm user:set-password <email> <password>` | api | Set a password directly, for accounts whose inbox is unreachable |
 
 There is **no test suite yet.** `pnpm lint` and `pnpm build` are the only automated
 checks, so run both before pushing.
@@ -298,6 +319,43 @@ Reads go through `GET /uploads/documents/:documentId`, which allows the owning u
 **If you add anything here, do not reintroduce a static mount for `UPLOAD_DIR`.** That was
 the original bug: every document was readable by anyone who guessed a filename.
 
+## Accounts and passwords
+
+Sign in is **email + password**. A one-time code is only used to confirm an address at
+signup and to authorise a password reset.
+
+| Flow | What happens |
+|---|---|
+| **Signup** | `/signup` — pick a role, set an email and password. The account is created unverified and a 6-digit code is emailed. Entering it confirms the address and signs you in. |
+| **Login** | `/login` — email and password. A wrong password and an unknown email give the same error, so the form cannot be used to discover which accounts exist. |
+| **Forgot password** | `/forgot-password` — a code is emailed, then you set a new password and are signed in. Every existing session is revoked. |
+
+**Accounts created before password login have no password.** `users.passwordHash` is
+nullable, so nothing needed migrating: logging in returns `PASSWORD_NOT_SET` and the UI
+sends you to *Forgot password* to set one. That is the normal path for any older account.
+
+For an account whose inbox cannot receive mail — the seeded `admin@nestos.in` — set one
+directly instead:
+
+```bash
+cd apps/api
+pnpm user:set-password admin@nestos.in 'YourAdminPassword1'
+```
+
+Admins cannot sign up: `auth.validation.ts` restricts self-signup to `OWNER` and `TENANT`.
+Create one with `pnpm admin:create <email>`.
+
+**If email is not working locally,** the code is still printed in the API terminal:
+
+```
+🔥 EMAIL FAILED — OTP for you@example.com: 481920
+```
+
+The signup screen will show an error in that case even though the account was created —
+retrying the signup with the same email re-sends the code.
+
+---
+
 ## Getting an owner verified
 
 Most owner routes require `verificationStatus = VERIFIED`, so a fresh owner account can't
@@ -316,9 +374,13 @@ cd apps/api
 pnpm admin:create you@example.com     # or use the seeded admin@nestos.in
 ```
 
-Then sign in at `/login` with that address and open `/admin`. Login is OTP-by-email
-either way, so use an address you can receive mail at — or read the code from the API
-console in development.
+The seeded `admin@nestos.in` cannot receive mail, so give it a password directly:
+
+```bash
+pnpm user:set-password admin@nestos.in 'YourAdminPassword1'
+```
+
+Then sign in at `/login` and open `/admin`.
 
 To skip the whole gate while developing, open `pnpm db:studio` and set
 `owner_profiles.verificationStatus` to `VERIFIED` directly.
@@ -334,14 +396,15 @@ Actively under development. Check here before assuming something you wrote is br
 | 9 | No shared types package — `apps/web/src/types/index.ts` mirrors the Prisma schema by hand and will drift. |
 | 10 | No tests and no CI. `pnpm lint` and `pnpm build` are the only automated checks. |
 | 11 | `dashboardRouter` is mounted at both `/owner/dashboard` and `/tenant/dashboard` while defining `/owner` and `/tenant` paths, so the real URLs double up (`/owner/dashboard/owner`). It works and the frontend matches, but it reads oddly — this is the same shape that made notices 404 before it was fixed. |
-| 12 | The admin UI covers owner verification only. There is no user management, and rejected owners can resubmit only by re-uploading documents. |
+| 12 | The admin UI covers owner verification and tenant identity only. There is no user management, and a rejected owner or tenant can only resubmit by re-uploading documents. |
+| 13 | Payment confirmation is a manual trust step. A UPI intent payment leaves no server-side trail, so nothing stops an owner confirming money that never arrived. Inherent to zero-fee UPI; a gateway with webhooks is the alternative. |
+| 14 | Uploaded documents are stored on local disk, so they do not survive a redeploy on a host with an ephemeral filesystem. |
 
 ### Fixed
 
-Issues 1–8 are resolved on the `fix/known-issues` branch: notices routing, property search
-ordering, public property access for tenants, token refresh, file uploads, the
-unauthenticated document mount, the broken `pnpm start`, and the personal-Gmail
-`EMAIL_FROM` default. See `CLAUDE-FIX.md` for detail.
+Issues 1–8 are resolved: notices routing, property search ordering, public property access
+for tenants, token refresh, file uploads, the unauthenticated document mount, the broken
+`pnpm start`, and the personal-Gmail `EMAIL_FROM` default. See `CLAUDE-FIX.md` for detail.
 
 ---
 

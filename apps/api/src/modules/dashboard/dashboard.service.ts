@@ -210,13 +210,26 @@ export async function getTenantDashboardService(tenantUserId: string) {
   }
 
   // Active resident dashboard
-  const activeBooking = await prisma.booking.findFirst({
+  const bookingRow = await prisma.booking.findFirst({
     where:   { tenantId: tenant.id, status: 'CONFIRMED' },
     include: {
       building: { select: { name: true, addressLine1: true, city: true, contactPhone: true } },
       bed:      { select: { bedLabel: true } },
     },
   })
+
+  // Booking carries roomId but has no room relation, so it cannot be included —
+  // the same reason bookings.service.ts looks rooms up separately. The dashboard
+  // renders the room number, and its absence threw during render and blanked the
+  // page, which stayed hidden until a tenant could actually reach ACTIVE.
+  const room = bookingRow
+    ? await prisma.room.findUnique({
+        where:  { id: bookingRow.roomId },
+        select: { roomNumber: true, type: true },
+      })
+    : null
+
+  const activeBooking = bookingRow ? { ...bookingRow, room } : null
 
   const now         = new Date()
   const thisMonth   = now.getMonth() + 1

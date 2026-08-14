@@ -125,10 +125,12 @@ function SearchingDashboard({ data }: { data: Record<string, unknown> }) {
 }
 
 function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
+  // Nested relations depend on what the endpoint includes, so they are optional
+  // here — a missing one should degrade the text, not crash the page.
   const booking  = data.activeBooking as {
-    building: { name: string; addressLine1: string; contactPhone?: string }
-    room: { roomNumber: string }
-    bed: { bedLabel: string }
+    building?: { name?: string; addressLine1?: string; contactPhone?: string }
+    room?: { roomNumber?: string }
+    bed?: { bedLabel?: string }
     moveInDate: string
   } | null
 
@@ -172,7 +174,9 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
         <h1 className="text-xl font-bold text-gray-900">My home</h1>
         {booking && (
           <p className="text-sm text-gray-500">
-            {booking.building.name} · Room {booking.room.roomNumber}, Bed {booking.bed.bedLabel}
+            {booking.building?.name}
+            {booking.room?.roomNumber ? ` · Room ${booking.room.roomNumber}` : ''}
+            {booking.bed?.bedLabel ? `, Bed ${booking.bed.bedLabel}` : ''}
           </p>
         )}
       </div>
@@ -248,12 +252,12 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
           <div className="space-y-2 text-sm text-gray-600">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-gray-400" />
-              <span>{booking.building.addressLine1}</span>
+              <span>{booking.building?.addressLine1 ?? '—'}</span>
             </div>
             <p className="text-xs text-gray-400">
               Move-in: {formatDate(booking.moveInDate)}
             </p>
-            {booking.building.contactPhone && (
+            {booking.building?.contactPhone && (
               <p className="text-xs text-gray-500">
                 Owner: {booking.building.contactPhone}
               </p>

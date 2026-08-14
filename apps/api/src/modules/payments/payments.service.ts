@@ -50,8 +50,15 @@ export async function createPaymentOrderService(
   })
   if (!tenantProfile) throw new NotFoundError('Tenant profile not found')
 
+  // PENDING is allowed on purpose: a self-service booking starts PENDING and is
+  // confirmed by paying the deposit. Requiring CONFIRMED here deadlocked the
+  // flow — the tenant could not pay, and nothing else moved the booking on.
   const booking = await prisma.booking.findFirst({
-    where: { id: dto.bookingId, tenantId: tenantProfile.id, status: 'CONFIRMED' },
+    where: {
+      id:       dto.bookingId,
+      tenantId: tenantProfile.id,
+      status:   { in: ['PENDING', 'CONFIRMED'] },
+    },
     include: {
       building: {
         select: {
@@ -73,6 +80,13 @@ export async function createPaymentOrderService(
 
   let amountRupees: number
   let description: string
+
+  if (dto.type === 'RENT' && booking.status !== 'CONFIRMED') {
+    throw new BadRequestError(
+      'Pay the security deposit first — that confirms your booking.',
+      'DEPOSIT_NOT_PAID'
+    )
+  }
 
   if (dto.type === 'RENT') {
     if (!dto.billingMonth || !dto.billingYear) {
@@ -198,11 +212,24 @@ export async function confirmPaymentService(
       },
     })
 
-    // Handle security deposit
+    // Confirming the deposit is what turns a self-service booking into a real
+    // tenancy. This mirrors assignBedService, which is the owner-driven path to
+    // the same end state. Previously only depositPaid was set, so the booking
+    // stayed PENDING for ever and the bed stayed RESERVED.
     if (payment.type === 'SECURITY_DEPOSIT') {
-      await tx.booking.update({
+      const booking = await tx.booking.update({
         where: { id: payment.bookingId },
-        data:  { depositPaid: true },
+        data:  { depositPaid: true, status: 'CONFIRMED' },
+      })
+
+      await tx.bed.update({
+        where: { id: booking.bedId },
+        data:  { status: 'OCCUPIED', currentTenantId: booking.tenantId },
+      })
+
+      await tx.tenantProfile.update({
+        where: { id: booking.tenantId },
+        data:  { status: 'ACTIVE' },
       })
     }
   })
@@ -232,16 +259,25 @@ export async function getMyPaymentsService(tenantUserId: string, query: Record<s
     prisma.payment.count({ where: { tenantId: tenantProfile.id } }),
   ])
 
-  const totalPaid = await prisma.payment.aggregate({
-    where:  { tenantId: tenantProfile.id, status: 'SUCCESS' },
-    _sum:   { amountRupees: true },
-  })
+  const [totalPaid, totalPending] = await Promise.all([
+    prisma.payment.aggregate({
+      where: { tenantId: tenantProfile.id, status: 'SUCCESS' },
+      _sum:  { amountRupees: true },
+    }),
+    // A UPI payment sits PENDING until the owner confirms the reference, so
+    // without this the money a tenant has already sent is invisible to them.
+    prisma.payment.aggregate({
+      where: { tenantId: tenantProfile.id, status: 'PENDING' },
+      _sum:  { amountRupees: true },
+    }),
+  ])
 
   return {
     items:      payments,
     pagination: buildPaginationMeta(page, limit, total),
     summary: {
-      totalPaid:     Number(totalPaid._sum.amountRupees ?? 0),
+      totalPaid:        Number(totalPaid._sum.amountRupees ?? 0),
+      totalPending:     Number(totalPending._sum.amountRupees ?? 0),
     },
   }
 }
@@ -276,7 +312,7 @@ export async function getOwnerPaymentsService(ownerId: string, query: Record<str
     ...(tenantId && { tenantId }),
   }
 
-  const [paymentsRaw, total, summary] = await Promise.all([
+  const [paymentsRaw, total, summary, pending] = await Promise.all([
     prisma.payment.findMany({
       where,
       skip,
@@ -296,6 +332,12 @@ export async function getOwnerPaymentsService(ownerId: string, query: Record<str
     prisma.payment.count({ where }),
     prisma.payment.aggregate({
       where: { ownerId, status: 'SUCCESS' },
+      _sum: { amountRupees: true },
+    }),
+    // The owner page renders summary.pendingAmount, which was never returned —
+    // "Pending" always read as zero however many payments awaited confirmation.
+    prisma.payment.aggregate({
+      where: { ownerId, status: 'PENDING' },
       _sum: { amountRupees: true },
     }),
   ])
@@ -337,6 +379,7 @@ export async function getOwnerPaymentsService(ownerId: string, query: Record<str
     pagination: buildPaginationMeta(page, limit, total),
     summary: {
       totalCollected: Number(summary._sum.amountRupees ?? 0),
+      pendingAmount:  Number(pending._sum.amountRupees ?? 0),
     },
   }
 }

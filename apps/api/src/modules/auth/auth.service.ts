@@ -14,7 +14,10 @@ import {
   BadRequestError, UnauthorizedError,
   NotFoundError, ConflictError
 } from '@utils/errors'
-import { SendOtpDto, VerifyOtpDto } from './auth.validation'
+import {
+  SendOtpDto, VerifyOtpDto, SignupDto, LoginDto,
+  ForgotPasswordDto, ResetPasswordDto,
+} from './auth.validation'
 import { UserRole } from '@prisma/client'
 import { v4 as uuidv4 } from 'uuid'
 import bcrypt from 'bcryptjs'
@@ -22,210 +25,141 @@ import bcrypt from 'bcryptjs'
 // ─────────────────────────────────────────────────────────────
 // sendOtp — generates, hashes, stores, and sends an OTP
 // ─────────────────────────────────────────────────────────────
-export async function sendOtpService(dto: SendOtpDto) {
-  console.log('=== SEND OTP SERVICE CALLED ===');
-  console.log('DTO:', dto);
-
-  const { email, role } = dto;
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, role: true },
-  });
-
-  if (existingUser && role && existingUser.role !== role) {
-    throw new ConflictError(
-      `An account with this email already exists as ${existingUser.role.toLowerCase()}.`,
-      'ROLE_MISMATCH'
-    );
-  }
-
+/**
+ * Generates a one-time code, stores its hash and emails it.
+ *
+ * Any previously issued code for the address is retired first, so only the most
+ * recent one can be used.
+ */
+async function issueOtp(email: string): Promise<void> {
   await prisma.otpCode.updateMany({
     where: { identifier: email, usedAt: null },
-    data: { usedAt: new Date() },
-  });
+    data:  { usedAt: new Date() },
+  })
 
-  const otp = generateOtp();
-  console.log('NODE_ENV:', process.env.NODE_ENV);
-  console.log('env.isDevelopment:', env.isDevelopment);
+  const code      = generateOtp()
+  const codeHash  = await hashOtp(code)
+  const expiresAt = getOtpExpiry(env.OTP_EXPIRY_MINUTES)
 
-  const codeHash = await hashOtp(otp);
-  const expiresAt = getOtpExpiry(env.OTP_EXPIRY_MINUTES);
-
-  await prisma.otpCode.create({
-    data: { identifier: email, codeHash, expiresAt },
-  });
+  await prisma.otpCode.create({ data: { identifier: email, codeHash, expiresAt } })
 
   try {
-  await sendOtpEmail(email, otp)
+    await sendOtpEmail(email, code)
+    if (env.isDevelopment) {
+      console.log(`🔥 DEV OTP for ${email}: ${code}`)
+    }
+  } catch (error) {
+    logger.error('Failed to send OTP email', 'AuthService', error)
 
-  // 👇 ALWAYS log in development
-  if (env.isDevelopment) {
-    console.log(`🔥 DEV OTP for ${email}: ${otp}`)
+    // Still surfaced locally so development is not blocked by SMTP.
+    if (env.isDevelopment) {
+      console.log(`🔥 EMAIL FAILED — OTP for ${email}: ${code}`)
+    }
+
+    throw new BadRequestError(
+      'Failed to send OTP email. Please try again.',
+      'EMAIL_SEND_FAILED'
+    )
   }
-
-} catch (error) {
-  logger.error('Failed to send OTP email', 'AuthService', error)
-
-  // 👇 FALLBACK — still show OTP in terminal
-  if (env.isDevelopment) {
-    console.log(`🔥 EMAIL FAILED — OTP for ${email}: ${otp}`)
-  }
-
-  throw new BadRequestError(
-    'Failed to send OTP email. Please try again.',
-    'EMAIL_SEND_FAILED'
-  )
 }
 
-  return {
-    identifier: email,
-    expiresInSeconds: env.OTP_EXPIRY_MINUTES * 60,
-    maskedEmail: maskEmail(email),
-  };
-}
-
-// ─────────────────────────────────────────────────────────────
-// verifyOtp — verifies OTP, creates user if new, issues tokens
-// ─────────────────────────────────────────────────────────────
-export async function verifyOtpService(dto: VerifyOtpDto) {
-  const { email, otp, role } = dto
-
-  // Find the most recent active OTP
-  const otpRecord = await prisma.otpCode.findFirst({
-    where: {
-      identifier: email,
-      usedAt: null,
-      expiresAt: { gt: new Date() },
-    },
+/** Verifies a code and marks it used. Throws if it is wrong, stale or exhausted. */
+async function consumeOtp(email: string, code: string): Promise<void> {
+  const record = await prisma.otpCode.findFirst({
+    where:   { identifier: email, usedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: 'desc' },
   })
 
-  if (!otpRecord) {
+  if (!record) {
     throw new UnauthorizedError(
       'No active OTP found. Please request a new one.',
       'OTP_NOT_FOUND'
     )
   }
 
-  // Check attempt count
-  if (otpRecord.attempts >= env.OTP_MAX_ATTEMPTS) {
+  if (record.attempts >= env.OTP_MAX_ATTEMPTS) {
     throw new UnauthorizedError(
       'Maximum attempts exceeded. Please request a new OTP.',
       'OTP_MAX_ATTEMPTS'
     )
   }
 
-  // Increment attempt count before verifying
   await prisma.otpCode.update({
-    where: { id: otpRecord.id },
-    data: { attempts: { increment: 1 } },
+    where: { id: record.id },
+    data:  { attempts: { increment: 1 } },
   })
 
-  // Verify the OTP
-  const isValid = await verifyOtp(otp, otpRecord.codeHash)
-  if (!isValid) {
-    const remaining = env.OTP_MAX_ATTEMPTS - (otpRecord.attempts + 1)
+  if (!(await verifyOtp(code, record.codeHash))) {
+    const remaining = env.OTP_MAX_ATTEMPTS - (record.attempts + 1)
     throw new UnauthorizedError(
       `Invalid OTP. ${remaining} attempt(s) remaining.`,
       'INVALID_OTP'
     )
   }
 
-  // Mark OTP as used
   await prisma.otpCode.update({
-    where: { id: otpRecord.id },
-    data: { usedAt: new Date() },
+    where: { id: record.id },
+    data:  { usedAt: new Date() },
+  })
+}
+
+/**
+ * Resends the signup code. Only ever used for an account that already exists
+ * but has not confirmed its address — accounts are created by signupService.
+ */
+export async function sendOtpService(dto: SendOtpDto) {
+  const { email, role } = dto
+
+  const existingUser = await prisma.user.findUnique({
+    where:  { email },
+    select: { id: true, role: true },
   })
 
-  // Get or create the user
-  let user = await prisma.user.findUnique({ where: { email } })
-  let isNewUser = false
-
-  if (!user) {
-    if (!role) {
-      throw new BadRequestError(
-        'Role is required for first-time signup.',
-        'ROLE_REQUIRED'
-      )
-    }
-
-    // Create user and their profile in a transaction
-    user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          email,
-          role: role as UserRole,
-          isEmailVerified: true,
-        },
-      })
-
-      // Create role-specific profile
-      if (role === 'OWNER') {
-        await tx.ownerProfile.create({
-          data: {
-            userId: newUser.id,
-            fullName: '',  // filled during onboarding
-          },
-        })
-      } else if (role === 'TENANT') {
-        await tx.tenantProfile.create({
-          data: {
-            userId: newUser.id,
-            fullName: '',  // filled during onboarding
-          },
-        })
-      }
-
-      return newUser
-    })
-
-    isNewUser = true
-  } else {
-    // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date(), isEmailVerified: true },
-    })
+  if (existingUser && role && existingUser.role !== role) {
+    throw new ConflictError(
+      `An account with this email already exists as ${existingUser.role.toLowerCase()}.`,
+      'ROLE_MISMATCH'
+    )
   }
 
-  // Create refresh token
-  const tokenId = uuidv4()
-  const tokenHash = await bcrypt.hash(tokenId, 10)
-  const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      tokenHash,
-      expiresAt: refreshExpiresAt,
-    },
-  })
-
-  // Sign tokens
-  const accessToken = signAccessToken({
-    userId: user.id,
-    role: user.role,
-    email: user.email,
-  })
-
-  const refreshToken = signRefreshToken({
-    userId: user.id,
-    tokenId,
-  })
+  await issueOtp(email)
 
   return {
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      isEmailVerified: user.isEmailVerified,
-      isNewUser,
-    },
-    accessToken,
-    refreshToken,
-    expiresIn: 900,
+    identifier:       email,
+    expiresInSeconds: env.OTP_EXPIRY_MINUTES * 60,
+    maskedEmail:      maskEmail(email),
   }
+}
+
+/**
+ * Confirms the address after signup and starts a session.
+ *
+ * This no longer creates accounts: signup does that, with a password. A code
+ * for an address with no account is treated as invalid.
+ */
+export async function verifyOtpService(dto: VerifyOtpDto) {
+  const { email, otp: code } = dto
+
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user || !user.isActive || user.deletedAt) {
+    throw new UnauthorizedError(
+      'No account found for this email. Please sign up first.',
+      'ACCOUNT_NOT_FOUND'
+    )
+  }
+
+  await consumeOtp(email, code)
+
+  const wasUnverified = !user.isEmailVerified
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data:  { isEmailVerified: true, lastLoginAt: new Date() },
+  })
+
+  const session = await issueSession({ ...user, isEmailVerified: true })
+
+  return { ...session, user: { ...session.user, isNewUser: wasUnverified } }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -379,4 +313,187 @@ export async function logoutService(refreshTokenCookie: string | undefined): Pro
   } catch (err) {
     logger.warn('Logout could not revoke the refresh token', 'AuthService', err)
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Password authentication
+//
+// OTP is no longer the way in. It now does two jobs only: proving you own the
+// address at signup, and authorising a password reset. Day-to-day login is
+// email + password.
+// ─────────────────────────────────────────────────────────────
+
+const BCRYPT_ROUNDS = 10
+
+/** Issues an access/refresh pair and records the refresh token. */
+async function issueSession(user: {
+  id: string
+  email: string
+  role: UserRole
+  isEmailVerified: boolean
+}) {
+  const tokenId   = uuidv4()
+  const tokenHash = await bcrypt.hash(tokenId, BCRYPT_ROUNDS)
+
+  await prisma.refreshToken.create({
+    data: {
+      userId:    user.id,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  })
+
+  return {
+    user: {
+      id:              user.id,
+      email:           user.email,
+      role:            user.role,
+      isEmailVerified: user.isEmailVerified,
+    },
+    accessToken:  signAccessToken({ userId: user.id, role: user.role, email: user.email }),
+    refreshToken: signRefreshToken({ userId: user.id, tokenId }),
+    expiresIn:    900,
+  }
+}
+
+/** Creates the account (unverified) and emails an OTP to confirm the address. */
+export async function signupService(dto: SignupDto) {
+  const { email, password, role } = dto
+
+  const existing = await prisma.user.findUnique({ where: { email } })
+
+  if (existing) {
+    // An unverified account can be re-registered — someone who abandoned signup
+    // should not be locked out of their own address.
+    if (existing.isEmailVerified) {
+      throw new ConflictError(
+        'An account with this email already exists. Log in instead.',
+        'EMAIL_IN_USE'
+      )
+    }
+
+    await prisma.user.update({
+      where: { id: existing.id },
+      data:  { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS), role: role as UserRole },
+    })
+  } else {
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+
+    await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: { email, role: role as UserRole, passwordHash, isEmailVerified: false },
+      })
+
+      if (role === 'OWNER') {
+        await tx.ownerProfile.create({ data: { userId: newUser.id, fullName: '' } })
+      } else {
+        await tx.tenantProfile.create({ data: { userId: newUser.id, fullName: '' } })
+      }
+    })
+  }
+
+  await issueOtp(email)
+
+  return {
+    identifier:       email,
+    expiresInSeconds: env.OTP_EXPIRY_MINUTES * 60,
+    maskedEmail:      maskEmail(email),
+  }
+}
+
+export async function loginService(dto: LoginDto) {
+  const { email, password } = dto
+
+  const user = await prisma.user.findUnique({ where: { email } })
+
+  // Same message whether the address is unknown or the password is wrong, so
+  // this cannot be used to discover which accounts exist.
+  const invalid = () =>
+    new UnauthorizedError('Incorrect email or password.', 'INVALID_CREDENTIALS')
+
+  if (!user || user.deletedAt) throw invalid()
+  if (!user.isActive) {
+    throw new UnauthorizedError('This account has been deactivated.', 'ACCOUNT_INACTIVE')
+  }
+
+  // Accounts that predate password login, including the seeded admin.
+  if (!user.passwordHash) {
+    throw new BadRequestError(
+      'This account has no password yet. Use "Forgot password" to set one.',
+      'PASSWORD_NOT_SET'
+    )
+  }
+
+  if (!(await bcrypt.compare(password, user.passwordHash))) throw invalid()
+
+  if (!user.isEmailVerified) {
+    throw new BadRequestError(
+      'Please verify your email address first. We can send you a new code.',
+      'EMAIL_NOT_VERIFIED'
+    )
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data:  { lastLoginAt: new Date() },
+  })
+
+  return issueSession(user)
+}
+
+/**
+ * Always reports success. Confirming whether an address is registered would
+ * turn this into an account-enumeration oracle.
+ */
+export async function forgotPasswordService(dto: ForgotPasswordDto) {
+  const user = await prisma.user.findUnique({ where: { email: dto.email } })
+
+  if (user && user.isActive && !user.deletedAt) {
+    try {
+      await issueOtp(dto.email)
+    } catch (err) {
+      // Never surface a send failure here. Throwing would make a registered
+      // address answer differently from an unknown one, which is precisely the
+      // enumeration oracle this endpoint exists to avoid.
+      logger.error('Failed to send password reset email', 'AuthService', err)
+    }
+  } else {
+    logger.warn('Password reset requested for an unknown address', 'AuthService')
+  }
+
+  return {
+    identifier:       dto.email,
+    expiresInSeconds: env.OTP_EXPIRY_MINUTES * 60,
+    maskedEmail:      maskEmail(dto.email),
+  }
+}
+
+export async function resetPasswordService(dto: ResetPasswordDto) {
+  const { email, otp: code, password } = dto
+
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user || !user.isActive || user.deletedAt) {
+    throw new UnauthorizedError('Invalid or expired code.', 'INVALID_OTP')
+  }
+
+  await consumeOtp(email, code)
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data:  {
+        passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS),
+        // Setting a password by email also proves the address.
+        isEmailVerified: true,
+        lastLoginAt:     new Date(),
+      },
+    }),
+    // Any session opened before the reset is no longer trustworthy.
+    prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data:  { revokedAt: new Date() },
+    }),
+  ])
+
+  return issueSession({ ...user, isEmailVerified: true })
 }
