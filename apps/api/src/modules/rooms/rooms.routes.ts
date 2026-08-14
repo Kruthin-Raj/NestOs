@@ -17,7 +17,10 @@ const createRoomSchema = z.object({
   roomNumber:  z.string().min(1).max(20).trim(),
   type:        z.enum(['PRIVATE', 'SHARED', 'DORMITORY']),
   capacity:    z.number().int().min(1).max(20),
-  baseRent:    z.number().positive().min(1000),
+  // Matches the bed rule (beds.routes.ts) and the form, which labels this
+  // "rent per bed". A room floor above its own beds' floor made no sense and
+  // silently 422'd anything a dormitory owner tried to enter.
+  baseRent:    z.number().positive().min(500),
   description: z.string().max(500).optional(),
   amenities:   z.array(z.string().max(50)).max(10).optional(),
 })

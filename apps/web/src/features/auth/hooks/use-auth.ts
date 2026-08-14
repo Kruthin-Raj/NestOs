@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { getMe, logout, updateProfile, updatePreferences } from '../services/auth.service'
+import { getMe, logout, updateProfile, updatePreferences, getProfile } from '../services/auth.service'
 import { useAuthStore } from '@/store/auth.store'
 import { QUERY_KEYS } from '@/lib/utils/constants'
 import { showToast } from '@/components/ui/toaster'
@@ -49,19 +49,39 @@ export function useUpdateProfile() {
     mutationFn: updateProfile,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.auth.me() })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.auth.profile() })
       showToast('Profile updated', 'success')
     },
-    onError: () => showToast('Update failed', 'error'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Update failed', 'error')
+    },
   })
 }
 
-// Deliberately does not invalidate auth.me — matching the behaviour this
-// replaced. Worth revisiting: the preferences form keeps showing stale values
-// until the next refetch.
 export function useUpdatePreferences() {
+  const qc = useQueryClient()
+
   return useMutation({
     mutationFn: updatePreferences,
-    onSuccess: () => showToast('Preferences updated', 'success'),
-    onError:   () => showToast('Update failed', 'error'),
+    onSuccess: () => {
+      // Preferences come back from /users/profile, so this must be refreshed or
+      // the form reverts to stale values on the next visit.
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.auth.profile() })
+      showToast('Preferences updated', 'success')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Update failed', 'error')
+    },
+  })
+}
+
+/** Full profile for the settings and onboarding forms. See getProfile(). */
+export function useProfile() {
+  return useQuery({
+    queryKey: QUERY_KEYS.auth.profile(),
+    queryFn:  getProfile,
+    staleTime: 60 * 1000,
   })
 }

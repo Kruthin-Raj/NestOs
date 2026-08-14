@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { CheckCircle, Circle } from 'lucide-react'
@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { FormField } from '@/components/ui/form-field'
+import { PhoneInput } from '@/components/ui/phone-input'
+import { requiredPhone } from '@/lib/utils/phone'
+import { useProfile } from '@/features/auth/hooks/use-auth'
 import { Card, CardTitle } from '@/components/ui/card'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
@@ -15,7 +18,7 @@ import { cn } from '@/lib/utils/cn'
 
 const profileSchema = z.object({
   fullName:          z.string().min(2, 'Enter your full name'),
-  phone:             z.string().regex(/^\+91[6-9]\d{9}$/, 'Enter valid Indian mobile'),
+  phone:             requiredPhone,
   dateOfBirth:       z.string().refine((d) => {
     const age = (Date.now() - new Date(d).getTime()) / (365.25 * 24 * 3600 * 1000)
     return age >= 18
@@ -25,7 +28,7 @@ const profileSchema = z.object({
   employerOrCollege: z.string().optional(),
   city:              z.string().min(2),
   emergencyName:     z.string().min(2),
-  emergencyPhone:    z.string().regex(/^\+91[6-9]\d{9}$/, 'Enter valid number'),
+  emergencyPhone:    requiredPhone,
   emergencyRelation: z.string().min(2),
 })
 
@@ -46,7 +49,26 @@ export default function TenantOnboardingPage() {
   const [step, setStep]  = useState(0)
   const [loading, setLoading] = useState(false)
 
-  const profileForm = useForm<ProfileValues>({ resolver: zodResolver(profileSchema) })
+  const { data: full } = useProfile()
+  const saved = full?.tenantProfile as Record<string, string | null> | undefined
+
+  // Prefill from what is already stored — `values` re-syncs when the profile
+  // request resolves, which defaultValues would not.
+  const profileForm = useForm<ProfileValues>({
+    resolver: zodResolver(profileSchema),
+    values: {
+      fullName:          saved?.fullName          ?? '',
+      phone:             saved?.phone             ?? '',
+      dateOfBirth:       saved?.dateOfBirth ? String(saved.dateOfBirth).slice(0, 10) : '',
+      gender:            (saved?.gender as never)     ?? undefined,
+      profession:        (saved?.profession as never) ?? undefined,
+      employerOrCollege: saved?.employerOrCollege ?? '',
+      city:              saved?.city              ?? '',
+      emergencyName:     saved?.emergencyName     ?? '',
+      emergencyPhone:    saved?.emergencyPhone    ?? '',
+      emergencyRelation: saved?.emergencyRelation ?? '',
+    },
+  })
   const prefsForm   = useForm<PrefsValues>({ resolver: zodResolver(prefsSchema) })
 
   async function saveProfile(values: ProfileValues) {
@@ -55,8 +77,9 @@ export default function TenantOnboardingPage() {
       await apiClient.patch('/users/profile', values)
       showToast('Profile saved', 'success')
       setStep(1)
-    } catch {
-      showToast('Failed to save profile', 'error')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Failed to save profile', 'error')
     } finally {
       setLoading(false)
     }
@@ -68,8 +91,9 @@ export default function TenantOnboardingPage() {
       await apiClient.patch('/users/preferences', values)
       showToast('Preferences saved', 'success')
       navigate('/tenant/dashboard')
-    } catch {
-      showToast('Failed to save preferences', 'error')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Failed to save preferences', 'error')
     } finally {
       setLoading(false)
     }
@@ -111,7 +135,18 @@ export default function TenantOnboardingPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Mobile" error={profileForm.formState.errors.phone?.message} required>
-                <Input {...profileForm.register('phone')} placeholder="+919876543210" />
+                <Controller
+                  name="phone"
+                  control={profileForm.control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      error={profileForm.formState.errors.phone?.message}
+                    />
+                  )}
+                />
               </FormField>
               <FormField label="Date of birth" error={profileForm.formState.errors.dateOfBirth?.message} required>
                 <Input {...profileForm.register('dateOfBirth')} type="date" />
@@ -164,7 +199,18 @@ export default function TenantOnboardingPage() {
                   </FormField>
                 </div>
                 <FormField label="Phone" error={profileForm.formState.errors.emergencyPhone?.message} required>
-                  <Input {...profileForm.register('emergencyPhone')} placeholder="+919876543211" />
+                  <Controller
+                    name="emergencyPhone"
+                    control={profileForm.control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        error={profileForm.formState.errors.emergencyPhone?.message}
+                      />
+                    )}
+                  />
                 </FormField>
               </div>
             </div>

@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { CheckCircle, Circle, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
+import { PhoneInput } from '@/components/ui/phone-input'
+import { requiredPhone } from '@/lib/utils/phone'
+import { useProfile } from '@/features/auth/hooks/use-auth'
 import { Card, CardTitle } from '@/components/ui/card'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
@@ -17,7 +20,7 @@ const profileSchema = z.object({
   businessName: z.string().optional(),
   city:         z.string().min(2, 'Enter your city'),
   state:        z.string().min(2, 'Enter your state'),
-  phone:        z.string().regex(/^\+91[6-9]\d{9}$/, 'Enter valid Indian mobile (+91XXXXXXXXXX)'),
+  phone:        requiredPhone,
 })
 type ProfileValues = z.infer<typeof profileSchema>
 
@@ -33,8 +36,20 @@ export default function OwnerOnboardingPage() {
   const [step, setStep]  = useState(0)
   const [loading, setLoading] = useState(false)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ProfileValues>({
+  const { data: full } = useProfile()
+  const saved = full?.ownerProfile as Record<string, string | null> | undefined
+
+  const { register, handleSubmit, control, formState: { errors } } = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
+    // Prefill anything already stored so returning to onboarding does not mean
+    // retyping everything. `values` re-syncs once the request resolves.
+    values: {
+      fullName:     saved?.fullName     ?? '',
+      businessName: saved?.businessName ?? '',
+      city:         saved?.city         ?? '',
+      state:        saved?.state        ?? '',
+      phone:        full?.user?.phone   ?? '',
+    },
   })
 
   async function onProfileSubmit(values: ProfileValues) {
@@ -43,8 +58,9 @@ export default function OwnerOnboardingPage() {
       await apiClient.patch('/users/profile', values)
       showToast('Profile saved', 'success')
       setStep(1)
-    } catch {
-      showToast('Failed to save profile', 'error')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Failed to save profile', 'error')
     } finally {
       setLoading(false)
     }
@@ -101,7 +117,18 @@ export default function OwnerOnboardingPage() {
               </FormField>
             </div>
             <FormField label="Mobile number" error={errors.phone?.message} required>
-              <Input {...register('phone')} placeholder="+919876543210" />
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    error={errors.phone?.message}
+                  />
+                )}
+              />
             </FormField>
             <Button type="submit" className="w-full" loading={loading}>
               Save and continue
