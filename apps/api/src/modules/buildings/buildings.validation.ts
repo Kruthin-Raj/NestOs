@@ -1,25 +1,29 @@
 import { z } from 'zod'
+import { optional, phoneNumber } from '@utils/zod.util'
 
 const buildingBaseSchema = z.object({
   name: z.string().min(3).max(255).trim(),
   type: z.enum(['PG', 'HOSTEL', 'APARTMENT', 'SHARED_FLAT']),
   genderPreference: z.enum(['MALE', 'FEMALE', 'CO_ED']),
   addressLine1: z.string().min(5).max(255).trim(),
-  addressLine2: z.string().max(255).optional(),
-  landmark: z.string().max(255).optional(),
+  addressLine2: optional(z.string().max(255)),
+  landmark: optional(z.string().max(255)),
   city: z.string().min(2).max(100).trim(),
   state: z.string().min(2).max(100).trim(),
   pincode: z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits'),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   totalFloors: z.number().int().min(1).max(50),
-  description: z.string().max(2000).optional(),
-  rules: z.string().max(2000).optional(),
+  description: optional(z.string().max(2000)),
+  rules: optional(z.string().max(2000)),
   depositMonths: z.number().int().min(0).max(6).optional(),
   depositFixed: z.number().positive().optional(),
   rentDueDay: z.number().int().min(1).max(28),
-  contactPhone: z.string().regex(/^\+91[6-9]\d{9}$/).optional(),
-  contactEmail: z.string().email().optional(),
+  // Left blank this used to send "", which is a string, so .optional() never
+  // applied and the regex rejected the whole request — every building created
+  // without a contact phone failed validation.
+  contactPhone: optional(phoneNumber),
+  contactEmail: optional(z.string().email()),
   amenities: z.array(z.string().max(50)).max(20).optional(),
 })
 

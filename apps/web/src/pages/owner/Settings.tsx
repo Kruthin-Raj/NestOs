@@ -1,18 +1,22 @@
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
-import { useMe, useUpdateProfile } from '@/features/auth/hooks/use-auth'
+import { PageLoader } from '@/components/feedback/loading-state'
+import { useMe, useProfile, useUpdateProfile } from '@/features/auth/hooks/use-auth'
+import { optionalPhone } from '@/lib/utils/phone'
 
 const schema = z.object({
-  fullName:     z.string().min(2),
+  fullName:     z.string().min(2, 'Enter your full name'),
   businessName: z.string().optional(),
-  phone:        z.string().regex(/^\+91[6-9]\d{9}$/, 'Enter valid Indian mobile').optional().or(z.literal('')),
+  phone:        optionalPhone,
+  upiId:        z.string().optional(),
   city:         z.string().optional(),
   state:        z.string().optional(),
 })
@@ -20,17 +24,27 @@ type FormValues = z.infer<typeof schema>
 
 export default function OwnerSettingsPage() {
   const { data: user } = useMe()
-  const profile = user?.ownerProfile
+  const { data: full, isLoading } = useProfile()
+  const { mutate, isPending } = useUpdateProfile()
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+  const profile = full?.ownerProfile as Record<string, string | null> | undefined
+
+  const { register, handleSubmit, control, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      fullName:     profile?.fullName ?? '',
+    // `values` (not `defaultValues`) — defaultValues is only read on the first
+    // render, which happens before the profile request resolves. That is why
+    // saved details never appeared and had to be retyped every visit.
+    values: {
+      fullName:     profile?.fullName     ?? '',
       businessName: profile?.businessName ?? '',
+      phone:        full?.user?.phone     ?? '',
+      upiId:        profile?.upiId        ?? '',
+      city:         profile?.city         ?? '',
+      state:        profile?.state        ?? '',
     },
   })
 
-  const { mutate, isPending } = useUpdateProfile()
+  if (isLoading) return <PageLoader />
 
   return (
     <div className="max-w-xl space-y-6">
@@ -40,7 +54,7 @@ export default function OwnerSettingsPage() {
       <Card>
         <CardTitle className="mb-3">Verification status</CardTitle>
         <div className="flex items-center gap-3">
-          <StatusBadge status={profile?.verificationStatus ?? 'PENDING'} />
+          <StatusBadge status={(profile?.verificationStatus as never) ?? 'PENDING'} />
           <p className="text-sm text-gray-600">
             {profile?.verificationStatus === 'VERIFIED'
               ? 'Your account is fully verified'
@@ -70,7 +84,25 @@ export default function OwnerSettingsPage() {
             <Input {...register('businessName')} placeholder="Optional" />
           </FormField>
           <FormField label="Mobile number" error={errors.phone?.message}>
-            <Input {...register('phone')} placeholder="+919876543210" />
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={errors.phone?.message}
+                />
+              )}
+            />
+          </FormField>
+          <FormField
+            label="UPI ID"
+            error={errors.upiId?.message}
+            hint="Required to collect rent — tenants pay this address directly"
+          >
+            <Input {...register('upiId')} placeholder="yourname@okhdfcbank" />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="City">

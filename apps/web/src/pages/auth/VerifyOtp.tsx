@@ -54,6 +54,32 @@ export default function VerifyOtpPage() {
     }
   }
 
+  /**
+   * Each box takes a single character, so pasting a 6-digit code used to drop
+   * five of them. Spread the pasted digits across the boxes from wherever the
+   * paste happened, and submit once all six are filled.
+   */
+  function handlePaste(index: number, e: React.ClipboardEvent) {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '')
+    if (!pasted) return
+
+    e.preventDefault()
+
+    const next = [...digits]
+    for (let i = 0; i < pasted.length && index + i < 6; i++) {
+      next[index + i] = pasted[i]
+    }
+    setDigits(next)
+
+    // Focus the first still-empty box, or the last one if the code is complete.
+    const firstEmpty = next.findIndex((d) => d === '')
+    inputRefs.current[firstEmpty === -1 ? 5 : firstEmpty]?.focus()
+
+    if (next.every((d) => d !== '')) {
+      handleSubmit(next.join(''))
+    }
+  }
+
   async function handleSubmit(otp: string) {
     setLoading(true)
     try {
@@ -116,6 +142,8 @@ export default function VerifyOtpPage() {
               value={digit}
               onChange={(e) => handleDigitChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
+              onPaste={(e) => handlePaste(i, e)}
+              autoComplete={i === 0 ? 'one-time-code' : 'off'}
               disabled={loading}
               className={cn(
                 'w-12 h-14 text-center text-xl font-bold border-2 rounded-xl',

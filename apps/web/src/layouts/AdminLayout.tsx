@@ -5,7 +5,8 @@ import { PageLoader } from '@/components/feedback/loading-state'
 import { cn } from '@/lib/utils/cn'
 
 const NAV_ITEMS = [
-  { href: '/admin/owners', label: 'Owner verification' },
+  { href: '/admin/owners',  label: 'Owner verification' },
+  { href: '/admin/tenants', label: 'Tenant identity' },
 ]
 
 /**

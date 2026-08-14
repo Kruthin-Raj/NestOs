@@ -49,6 +49,9 @@ export async function getFullProfileService(userId: string, role: UserRole) {
       id: true,
       email: true,
       role: true,
+      // Owners store their number on User (OwnerProfile has no phone column),
+      // so the settings form cannot prefill it without this.
+      phone: true,
       isEmailVerified: true,
       isPhoneVerified: true,
     },
@@ -89,7 +92,15 @@ export async function getFullProfileService(userId: string, role: UserRole) {
   if (role === UserRole.TENANT) {
     const tenantProfile = await prisma.tenantProfile.findUnique({
       where: { userId },
-      include: { preferences: true },
+      include: {
+        preferences: true,
+        // Needed to tell "not uploaded" from "uploaded, awaiting review" on the
+        // settings page. Same shape as the owner branch — no file keys.
+        documents: {
+          select: { documentType: true, status: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     })
 
     return {
@@ -119,12 +130,20 @@ export async function updateOwnerProfileService(
 
   if (!profile) throw new NotFoundError('Owner profile not found')
 
+  // Phone lives on User, not OwnerProfile — there is no phone column here.
+  // It used to be destructured out and silently dropped, so an owner could
+  // save their number and it would never persist.
   const { phone, ...ownerProfileData } = dto
 
-  await prisma.ownerProfile.update({
-    where: { userId },
-    data: ownerProfileData,
-  })
+  await prisma.$transaction([
+    prisma.ownerProfile.update({
+      where: { userId },
+      data: ownerProfileData,
+    }),
+    ...(phone !== undefined
+      ? [prisma.user.update({ where: { id: userId }, data: { phone } })]
+      : []),
+  ])
 
   return { updated: true }
 }

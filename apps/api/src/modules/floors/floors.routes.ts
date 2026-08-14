@@ -4,6 +4,7 @@ import { authenticate } from '@middleware/auth.middleware'
 import { requireVerifiedOwner } from '@middleware/rbac.middleware'
 import { validate } from '@middleware/validate.middleware'
 import { asyncHandler } from '@utils/async-handler'
+import { optional } from '@utils/zod.util'
 import { sendSuccess, sendCreated, sendNoContent } from '@utils/response.util'
 import {
   getFloorsService,
@@ -16,7 +17,10 @@ floorsRouter.use(authenticate, requireVerifiedOwner)
 
 const createFloorSchema = z.object({
   floorNumber: z.number().int().min(0).max(50),
-  label:       z.string().max(50).optional(),
+  // A blank label field posts "", which stored an empty string and then
+  // rendered as a nameless floor in the room form. Treat blank as absent so the
+  // "Floor <n>" fallback applies.
+  label:       optional(z.string().max(50).trim()),
 })
 
 floorsRouter.get('/:buildingId/floors',

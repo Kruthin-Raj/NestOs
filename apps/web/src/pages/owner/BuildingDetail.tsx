@@ -131,7 +131,7 @@ function FloorCard({ floor, buildingId }: { floor: Floor; buildingId: string }) 
     <Card padding={false}>
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-800">
-          {floor.label ?? `Floor ${floor.floorNumber}`}
+          {floor.label || `Floor ${floor.floorNumber}`}
         </h3>
         <span className="text-xs text-gray-500">
           {floor.rooms?.length ?? 0} rooms

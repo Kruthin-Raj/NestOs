@@ -31,6 +31,7 @@ import OwnerDashboard from '@/pages/owner/Dashboard'
 import OwnerBuildings from '@/pages/owner/Buildings'
 import OwnerBuildingNew from '@/pages/owner/BuildingNew'
 import OwnerBuildingDetail from '@/pages/owner/BuildingDetail'
+import OwnerBuildingEdit from '@/pages/owner/BuildingEdit'
 import OwnerRooms from '@/pages/owner/Rooms'
 import OwnerRoomDetail from '@/pages/owner/RoomDetail'
 import OwnerTenants from '@/pages/owner/Tenants'
@@ -44,6 +45,7 @@ import OwnerOnboarding from '@/pages/owner/Onboarding'
 // Admin
 import AdminLayout from '@/layouts/AdminLayout'
 import AdminPendingOwners from '@/pages/admin/PendingOwners'
+import AdminPendingTenants from '@/pages/admin/PendingTenants'
 
 export default function App() {
   return (
@@ -82,6 +84,7 @@ export default function App() {
         <Route path="buildings" element={<OwnerBuildings />} />
         <Route path="buildings/new" element={<OwnerBuildingNew />} />
         <Route path="buildings/:buildingId" element={<OwnerBuildingDetail />} />
+        <Route path="buildings/:buildingId/edit" element={<OwnerBuildingEdit />} />
         <Route path="buildings/:buildingId/rooms" element={<OwnerRooms />} />
         <Route path="buildings/:buildingId/rooms/:roomId" element={<OwnerRoomDetail />} />
         <Route path="tenants" element={<OwnerTenants />} />
@@ -96,6 +99,7 @@ export default function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="owners" replace />} />
         <Route path="owners" element={<AdminPendingOwners />} />
+        <Route path="tenants" element={<AdminPendingTenants />} />
       </Route>
 
       {/* Catch-all */}

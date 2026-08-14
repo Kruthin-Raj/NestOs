@@ -136,6 +136,8 @@ function AddFloorForm({ buildingId, onClose }: { buildingId: string; onClose: ()
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) })
 
   const { mutate, isPending } = useMutation({
+    // A blank label arrives as "" and is normalised to absent by the API, so
+    // the floor falls back to "Floor <n>" instead of rendering nameless.
     mutationFn: (v: unknown) => apiClient.post(`/buildings/${buildingId}/floors`, v),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.floors(buildingId) })
@@ -210,7 +212,7 @@ function AddRoomForm({
     </option>
     {floors.map((floor) => (
       <option key={floor.id} value={floor.id}>
-        {floor.label ?? `Floor ${floor.floorNumber}`}
+        {floor.label || `Floor ${floor.floorNumber}`}
       </option>
     ))}
   </select>

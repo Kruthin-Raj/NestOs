@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -6,20 +7,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { FormField } from '@/components/ui/form-field'
-import { Card, CardTitle } from '@/components/ui/card'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { LocationPicker, type LatLng } from '@/components/ui/location-picker'
+import { FormField } from '@/components/ui/form-field'
+import { Card, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared/page-header'
-import { useCreateBuilding } from '@/features/owner/buildings/hooks/use-buildings'
+import { PageLoader } from '@/components/feedback/loading-state'
+import { EmptyState } from '@/components/feedback/empty-state'
+import { useBuilding, useUpdateBuilding } from '@/features/owner/buildings/hooks/use-buildings'
+import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { AMENITY_OPTIONS, INDIAN_STATES } from '@/lib/utils/constants'
-import { useState } from 'react'
-import { cn } from '@/lib/utils/cn'
 import { optionalPhone } from '@/lib/utils/phone'
+import { cn } from '@/lib/utils/cn'
 
+// Property type is deliberately absent: the API's updateBuildingSchema omits
+// it, so a building cannot change type after creation.
 const schema = z.object({
   name:             z.string().min(3, 'Building name must be at least 3 characters'),
-  type:             z.enum(['PG', 'HOSTEL', 'APARTMENT', 'SHARED_FLAT']),
   genderPreference: z.enum(['MALE', 'FEMALE', 'CO_ED']),
   addressLine1:     z.string().min(5, 'Enter the full address'),
   addressLine2:     z.string().optional(),
@@ -28,58 +32,85 @@ const schema = z.object({
   state:            z.string().min(2, 'Select a state'),
   pincode:          z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits'),
   totalFloors:      z.coerce.number().int().min(1).max(50),
-  depositMonths:    z.coerce.number().int().min(0).max(6).default(2),
+  depositMonths:    z.coerce.number().int().min(0).max(6),
   rentDueDay:       z.coerce.number().int().min(1).max(28),
   description:      z.string().optional(),
   rules:            z.string().optional(),
   contactPhone:     optionalPhone,
 })
 
-// z.coerce.number() means the form's raw input type (unknown, straight from
-// the <input>) differs from the parsed output type (number). Keeping both
-// apart is what lets useForm type the resolver correctly without a cast.
 type FormInput  = z.input<typeof schema>
 type FormValues = z.output<typeof schema>
 
-export default function NewBuildingPage() {
+export default function EditBuildingPage() {
+  const buildingId = useRequiredParam('buildingId')
   const navigate = useNavigate()
-  const { mutate: create, isPending } = useCreateBuilding()
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
-  // Kept outside the form: these come from map clicks, not typed input, and a
-  // building cannot be made ACTIVE without them.
-  const [location, setLocation] = useState<LatLng | null>(null)
+  const { data: building, isLoading } = useBuilding(buildingId)
+  const { mutate: update, isPending } = useUpdateBuilding()
+  // Amenities are their own control rather than a form field. Derived from the
+  // building until the user touches them, which avoids seeding state from an
+  // effect once the request resolves.
+  const [locationOverride, setLocationOverride] = useState<LatLng | null>(null)
+  const [amenityOverride, setAmenityOverride] = useState<string[] | null>(null)
+  const savedAmenities = (building?.amenities as Array<{ name: string }> | undefined)
+    ?.map((a) => a.name) ?? []
+  const selectedAmenities = amenityOverride ?? savedAmenities
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { rentDueDay: 5, depositMonths: 2, totalFloors: 1 },
-  })
+  // Same derive-until-touched approach as amenities.
+  const savedLocation: LatLng | null =
+    building?.latitude != null && building?.longitude != null
+      ? { latitude: Number(building.latitude), longitude: Number(building.longitude) }
+      : null
+  const location = locationOverride ?? savedLocation
+
+  const { register, handleSubmit, control, formState: { errors } } =
+    useForm<FormInput, unknown, FormValues>({
+      resolver: zodResolver(schema),
+      values: {
+        name:             building?.name             ?? '',
+        genderPreference: (building?.genderPreference as never) ?? 'CO_ED',
+        addressLine1:     building?.addressLine1     ?? '',
+        addressLine2:     building?.addressLine2     ?? '',
+        landmark:         building?.landmark         ?? '',
+        city:             building?.city             ?? '',
+        state:            building?.state            ?? '',
+        pincode:          building?.pincode          ?? '',
+        totalFloors:      building?.totalFloors      ?? 1,
+        depositMonths:    building?.depositMonths    ?? 2,
+        rentDueDay:       building?.rentDueDay       ?? 5,
+        description:      building?.description      ?? '',
+        rules:            building?.rules            ?? '',
+        contactPhone:     building?.contactPhone     ?? '',
+      },
+    })
+
+  if (isLoading) return <PageLoader />
+  if (!building) return <EmptyState title="Building not found" />
 
   function toggleAmenity(name: string) {
-    setSelectedAmenities((prev) =>
-      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
-    )
+    setAmenityOverride((prev) => {
+      const base = prev ?? savedAmenities
+      return base.includes(name) ? base.filter((a) => a !== name) : [...base, name]
+    })
   }
 
   function onSubmit(values: FormValues) {
-    // Blank optional fields arrive as "" and are normalised away by the API
-    // (see optional() in apps/api/src/utils/zod.util.ts).
-    create(
-      { ...values, amenities: selectedAmenities, ...(location ?? {}) },
+    update(
       {
-        onSuccess: (data) => {
-          navigate(`/owner/buildings/${data.id}`)
-        },
-      }
+        id: buildingId,
+        payload: { ...values, amenities: selectedAmenities, ...(location ?? {}) },
+      },
+      { onSuccess: () => navigate(`/owner/buildings/${buildingId}`) }
     )
   }
 
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title="Add building"
-        description="Fill in the property details"
+        title="Edit building"
+        description={building.name}
         actions={
-          <Button variant="outline" onClick={() => navigate(-1)}>
+          <Button variant="outline" onClick={() => navigate(`/owner/buildings/${buildingId}`)}>
             Cancel
           </Button>
         }
@@ -90,34 +121,21 @@ export default function NewBuildingPage() {
           <CardTitle className="mb-4">Basic information</CardTitle>
           <div className="space-y-4">
             <FormField label="Building name" error={errors.name?.message} required>
-              <Input {...register('name')} placeholder="Sharma PG Block A" />
+              <Input {...register('name')} />
             </FormField>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Property type" error={errors.type?.message} required>
-                <Select
-                  {...register('type')}
-                  placeholder="Select type"
-                  options={[
-                    { value: 'PG',          label: 'PG' },
-                    { value: 'HOSTEL',       label: 'Hostel' },
-                    { value: 'APARTMENT',    label: 'Apartment' },
-                    { value: 'SHARED_FLAT',  label: 'Shared flat' },
-                  ]}
-                />
-              </FormField>
-              <FormField label="Gender preference" error={errors.genderPreference?.message} required>
-                <Select
-                  {...register('genderPreference')}
-                  placeholder="Select"
-                  options={[
-                    { value: 'MALE',   label: 'Male only' },
-                    { value: 'FEMALE', label: 'Female only' },
-                    { value: 'CO_ED',  label: 'Co-ed' },
-                  ]}
-                />
-              </FormField>
-            </div>
+            <FormField label="Gender preference" error={errors.genderPreference?.message} required>
+              <Select
+                {...register('genderPreference')}
+                options={[
+                  { value: 'MALE',   label: 'Male only' },
+                  { value: 'FEMALE', label: 'Female only' },
+                  { value: 'CO_ED',  label: 'Co-ed' },
+                ]}
+              />
+            </FormField>
+            <p className="text-xs text-gray-400">
+              Property type cannot be changed after a building is created.
+            </p>
           </div>
         </Card>
 
@@ -125,26 +143,25 @@ export default function NewBuildingPage() {
           <CardTitle className="mb-4">Address</CardTitle>
           <div className="space-y-4">
             <FormField label="Address line 1" error={errors.addressLine1?.message} required>
-              <Input {...register('addressLine1')} placeholder="42, Kondapur Main Road" />
+              <Input {...register('addressLine1')} />
             </FormField>
             <FormField label="Address line 2 / Apartment">
-              <Input {...register('addressLine2')} placeholder="Near Metro Station" />
+              <Input {...register('addressLine2')} />
             </FormField>
             <FormField label="Landmark">
-              <Input {...register('landmark')} placeholder="Opposite Axis Bank" />
+              <Input {...register('landmark')} />
             </FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="City" error={errors.city?.message} required>
-                <Input {...register('city')} placeholder="Hyderabad" />
+                <Input {...register('city')} />
               </FormField>
               <FormField label="Pincode" error={errors.pincode?.message} required>
-                <Input {...register('pincode')} placeholder="500084" maxLength={6} />
+                <Input {...register('pincode')} maxLength={6} />
               </FormField>
             </div>
             <FormField label="State" error={errors.state?.message} required>
               <Select
                 {...register('state')}
-                placeholder="Select state"
                 options={INDIAN_STATES.map((s) => ({ value: s, label: s }))}
               />
             </FormField>
@@ -187,7 +204,7 @@ export default function NewBuildingPage() {
           <p className="text-sm text-gray-500 mb-3">
             Required before the property can be listed as active.
           </p>
-          <LocationPicker value={location} onChange={setLocation} />
+          <LocationPicker value={location} onChange={setLocationOverride} />
         </Card>
 
         <Card>
@@ -215,28 +232,25 @@ export default function NewBuildingPage() {
           <CardTitle className="mb-4">Description and rules</CardTitle>
           <div className="space-y-4">
             <FormField label="Description">
-              <Textarea
-                {...register('description')}
-                rows={3}
-                placeholder="Describe your property..."
-              />
+              <Textarea {...register('description')} rows={3} />
             </FormField>
             <FormField label="House rules">
-              <Textarea
-                {...register('rules')}
-                rows={3}
-                placeholder="No smoking. Guests allowed till 10 PM..."
-              />
+              <Textarea {...register('rules')} rows={3} />
             </FormField>
           </div>
         </Card>
 
         <div className="flex gap-3 pb-6">
-          <Button type="button" variant="outline" onClick={() => navigate(-1)} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate(`/owner/buildings/${buildingId}`)}
+            className="flex-1"
+          >
             Cancel
           </Button>
           <Button type="submit" loading={isPending} className="flex-1">
-            Create building
+            Save changes
           </Button>
         </div>
       </form>

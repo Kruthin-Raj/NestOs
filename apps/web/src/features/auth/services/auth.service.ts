@@ -36,3 +36,27 @@ export async function updatePreferences(values: unknown) {
   const { data } = await apiClient.patch<ApiResponse<unknown>>('/users/preferences', values)
   return data.data
 }
+
+export interface FullProfile {
+  user: {
+    id: string
+    email: string
+    role: 'SUPER_ADMIN' | 'OWNER' | 'TENANT'
+    isEmailVerified: boolean
+    isPhoneVerified: boolean
+    phone?: string | null
+  }
+  ownerProfile?: Record<string, unknown> | null
+  tenantProfile?: Record<string, unknown> | null
+  preferences?: Record<string, unknown> | null
+}
+
+/**
+ * The complete profile record. /auth/me only returns a summary, which is why
+ * the settings and onboarding forms could never prefill what was in the
+ * database.
+ */
+export async function getProfile() {
+  const { data } = await apiClient.get<ApiResponse<FullProfile>>('/users/profile')
+  return data.data
+}
