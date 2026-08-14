@@ -1,4 +1,3 @@
-'use client'
 import { Menu } from 'lucide-react'
 import { useUIStore } from '@/store/ui.store'
 

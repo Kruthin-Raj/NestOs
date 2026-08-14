@@ -27,3 +27,12 @@ export async function getMe() {
 export async function logout() {
   await apiClient.post('/auth/logout')
 }
+export async function updateProfile(values: unknown) {
+  const { data } = await apiClient.patch<ApiResponse<User>>('/users/profile', values)
+  return data.data
+}
+
+export async function updatePreferences(values: unknown) {
+  const { data } = await apiClient.patch<ApiResponse<unknown>>('/users/preferences', values)
+  return data.data
+}

@@ -3,10 +3,18 @@ import { z } from 'zod'
 import { authenticate } from '@middleware/auth.middleware'
 import { isTenant, requireVerifiedOwner } from '@middleware/rbac.middleware'
 import { validate } from '@middleware/validate.middleware'
+import { asyncHandler } from '@utils/async-handler'
+import { sendSuccess, sendCreated } from '@utils/response.util'
 import {
-  createIssue, getMyIssues, getMyIssueById, addTenantComment, reopenIssue,
-  getOwnerIssues, updateIssueStatus, addOwnerComment,
-} from './issues.controller'
+  createIssueService,
+  getMyIssuesService,
+  getMyIssueByIdService,
+  addTenantCommentService,
+  reopenIssueService,
+  getOwnerIssuesService,
+  updateIssueStatusService,
+  addOwnerCommentService,
+} from './issues.service'
 
 const commentSchema = z.object({
   body:      z.string().min(5).max(1000).trim(),
@@ -21,20 +29,77 @@ const createIssueSchema = z.object({
   photoUrls:   z.array(z.string().url()).max(5).optional(),
 })
 
+type IssueParams = { issueId: string }
+
 export const issuesRouter: ReturnType<typeof Router> = Router()
+
 // Tenant routes
-issuesRouter.post('/',          authenticate, isTenant, validate(createIssueSchema), createIssue)
-issuesRouter.get('/my',         authenticate, isTenant, getMyIssues)
-issuesRouter.get('/my/:issueId',authenticate, isTenant, getMyIssueById)
-issuesRouter.post('/my/:issueId/comments', authenticate, isTenant, validate(commentSchema), addTenantComment)
+issuesRouter.post('/',
+  authenticate, isTenant,
+  validate(createIssueSchema),
+  asyncHandler(async (req, res) => {
+    const result = await createIssueService(req.user!.userId, req.body)
+    sendCreated(res, 'Issue created', result)
+  })
+)
+
+issuesRouter.get('/my',
+  authenticate, isTenant,
+  asyncHandler(async (req, res) => {
+    const result = await getMyIssuesService(
+      req.user!.userId,
+      req.query as Record<string, unknown>
+    )
+    sendSuccess(res, 'Issues fetched', result)
+  })
+)
+
+issuesRouter.get('/my/:issueId',
+  authenticate, isTenant,
+  asyncHandler<IssueParams>(async (req, res) => {
+    const result = await getMyIssueByIdService(req.params.issueId, req.user!.userId)
+    sendSuccess(res, 'Issue fetched', result)
+  })
+)
+
+issuesRouter.post('/my/:issueId/comments',
+  authenticate, isTenant,
+  validate(commentSchema),
+  asyncHandler<IssueParams>(async (req, res) => {
+    const result = await addTenantCommentService(
+      req.params.issueId,
+      req.user!.userId,
+      req.body
+    )
+    sendCreated(res, 'Comment added', result)
+  })
+)
+
 issuesRouter.post('/my/:issueId/reopen',
   authenticate, isTenant,
   validate(z.object({ reason: z.string().min(10).max(500).trim() })),
-  reopenIssue
+  asyncHandler<IssueParams>(async (req, res) => {
+    const result = await reopenIssueService(
+      req.params.issueId,
+      req.user!.userId,
+      req.body.reason
+    )
+    sendSuccess(res, 'Issue reopened', result)
+  })
 )
 
 // Owner routes
-issuesRouter.get('/owner',      authenticate, requireVerifiedOwner, getOwnerIssues)
+issuesRouter.get('/owner',
+  authenticate, requireVerifiedOwner,
+  asyncHandler(async (req, res) => {
+    const result = await getOwnerIssuesService(
+      req.resourceOwnerId!,
+      req.query as Record<string, unknown>
+    )
+    sendSuccess(res, 'Issues fetched', result)
+  })
+)
+
 issuesRouter.patch('/owner/:issueId/status',
   authenticate, requireVerifiedOwner,
   validate(z.object({
@@ -42,8 +107,25 @@ issuesRouter.patch('/owner/:issueId/status',
     note:            z.string().max(500).optional(),
     rejectionReason: z.string().min(5).max(500).optional(),
   })),
-  updateIssueStatus
+  asyncHandler<IssueParams>(async (req, res) => {
+    const result = await updateIssueStatusService(
+      req.params.issueId,
+      req.resourceOwnerId!,
+      req.body
+    )
+    sendSuccess(res, 'Issue status updated', result)
+  })
 )
+
 issuesRouter.post('/owner/:issueId/comments',
-  authenticate, requireVerifiedOwner, validate(commentSchema), addOwnerComment
+  authenticate, requireVerifiedOwner,
+  validate(commentSchema),
+  asyncHandler<IssueParams>(async (req, res) => {
+    const result = await addOwnerCommentService(
+      req.params.issueId,
+      req.resourceOwnerId!,
+      req.body
+    )
+    sendCreated(res, 'Comment added', result)
+  })
 )

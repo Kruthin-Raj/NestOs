@@ -1,6 +1,12 @@
 node_modules
-# Keep environment variables out of version control
-#follow above rule
-.env
+dist
+
+# Keep environment variables out of version control.
+# Every .env variant is ignored; only the placeholder example is committed.
+.env*
+!.env.example
+
+# Uploaded documents are user PII — never commit them
+/uploads
 
 /src/generated/prisma
