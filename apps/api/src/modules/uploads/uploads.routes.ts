@@ -1,41 +1,114 @@
-import { Router, Request, Response } from 'express'
+import fs from 'fs'
+import { Router } from 'express'
+import { z } from 'zod'
 import { authenticate } from '@middleware/auth.middleware'
-import { sendError } from '@utils/response.util'
-import { logger } from '@utils/logger'
+import { validate } from '@middleware/validate.middleware'
+import { asyncHandler } from '@utils/async-handler'
+import { sendSuccess, sendCreated } from '@utils/response.util'
+import {
+  createUploadUrlService,
+  storeUploadedFileService,
+  confirmUploadService,
+  getDocumentFileService,
+} from './uploads.service'
+
+const documentTypeEnum = z.enum([
+  'AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN_CARD', 'PASSPORT', 'DRIVING_LICENCE',
+  'VOTER_ID', 'PROPERTY_DEED', 'LEASE_AGREEMENT', 'UTILITY_BILL',
+  'PROPERTY_TAX', 'SELFIE', 'OTHER',
+])
+
+const presignedUrlSchema = z.object({
+  documentType:  documentTypeEnum,
+  fileName:      z.string().min(1).max(255),
+  mimeType:      z.string().min(1).max(100),
+  fileSizeBytes: z.number().int().positive(),
+})
+
+const confirmSchema = z.object({
+  fileKey:       z.string().min(1).max(300),
+  documentType:  documentTypeEnum,
+  fileName:      z.string().max(255).optional(),
+  fileSizeBytes: z.number().int().positive().optional(),
+  mimeType:      z.string().max(100).optional(),
+})
 
 export const uploadsRouter: ReturnType<typeof Router> = Router()
 
-// Every upload endpoint requires a logged-in user, stub or not.
-uploadsRouter.use(authenticate)
-
-// ─────────────────────────────────────────────────────────────
-// NOT IMPLEMENTED.
-//
-// The web client expects a presigned-URL flow:
-//   POST /uploads/presigned-url -> { uploadUrl, fileKey }
-//   PUT  <uploadUrl>            (raw file body)
-//   POST /uploads/confirm       -> persists Owner/TenantDocument
-//
-// The API is configured for local disk (env.UPLOAD_DIR) and has no
-// object-storage client. Implementing this stores government ID
-// documents, so it is tracked as its own change with its own tests.
-// Until then these endpoints fail explicitly rather than silently.
-//
-// Blocker for the real implementation: app.ts serves the whole
-// UPLOAD_DIR through unauthenticated express.static. That must be
-// replaced with an authenticated read route first.
-// ─────────────────────────────────────────────────────────────
-function notImplemented(route: string) {
-  return (_req: Request, res: Response): Response => {
-    logger.warn(`Upload endpoint called but not implemented: ${route}`, 'Uploads')
-    return sendError(
-      res,
-      'File uploads are not available yet.',
-      501,
-      'NOT_IMPLEMENTED'
+// POST /api/v1/uploads/presigned-url
+uploadsRouter.post('/presigned-url',
+  authenticate,
+  validate(presignedUrlSchema),
+  asyncHandler(async (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`
+    const result  = await createUploadUrlService(
+      req.user!.userId,
+      req.user!.role,
+      req.body,
+      baseUrl
     )
-  }
-}
+    sendSuccess(res, 'Upload URL created', result)
+  })
+)
 
-uploadsRouter.post('/presigned-url', notImplemented('POST /uploads/presigned-url'))
-uploadsRouter.post('/confirm',       notImplemented('POST /uploads/confirm'))
+// PUT /api/v1/uploads/raw/:uploadToken
+//
+// Intentionally NOT behind `authenticate`: the browser sends the raw file with
+// fetch(), which carries no cookies. The signed, short-lived token in the path
+// is the authorization, and it — not any request field — determines the
+// destination path. The body is streamed straight to disk; express.json ignores
+// it because the Content-Type is an image or PDF.
+uploadsRouter.put('/raw/:uploadToken',
+  asyncHandler<{ uploadToken: string }>(async (req, res) => {
+    const contentLengthHeader = req.get('content-length')
+
+    const result = await storeUploadedFileService(
+      req.params.uploadToken,
+      req.get('content-type'),
+      contentLengthHeader ? Number(contentLengthHeader) : undefined,
+      req
+    )
+
+    sendSuccess(res, 'File uploaded', {
+      fileKey:      result.fileKey,
+      bytesWritten: result.bytesWritten,
+    })
+  })
+)
+
+// POST /api/v1/uploads/confirm
+uploadsRouter.post('/confirm',
+  authenticate,
+  validate(confirmSchema),
+  asyncHandler(async (req, res) => {
+    const document = await confirmUploadService(
+      req.user!.userId,
+      req.user!.role,
+      req.body
+    )
+    sendCreated(res, 'Document uploaded', document)
+  })
+)
+
+// GET /api/v1/uploads/documents/:documentId
+//
+// The only way to read an uploaded document. Replaces the express.static mount
+// that used to serve the whole upload directory with no authorization at all.
+uploadsRouter.get('/documents/:documentId',
+  authenticate,
+  asyncHandler<{ documentId: string }>(async (req, res) => {
+    const file = await getDocumentFileService(
+      req.params.documentId,
+      req.user!.userId,
+      req.user!.role
+    )
+
+    res.setHeader('Content-Type', file.mimeType)
+    // attachment, and no-store: these are identity documents — keep them out of
+    // shared caches and out of the browser's inline renderer.
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`)
+    res.setHeader('Cache-Control', 'no-store, private')
+
+    fs.createReadStream(file.absolutePath).pipe(res)
+  })
+)

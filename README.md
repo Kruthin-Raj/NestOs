@@ -6,6 +6,10 @@ property owners and tenants.
 > **New to this repo?** Read [Architecture](#architecture), [Repo structure](#repo-structure)
 > and [Conventions](#conventions) before writing code. If you last saw this repo when it was
 > a Next.js app, read [What changed in the cleanup](#what-changed-in-the-cleanup) — files moved.
+>
+> **Just want it running?** [Getting Started](#getting-started), then
+> [Getting an owner verified](#getting-an-owner-verified) — the owner dashboard is gated
+> behind approval and that trips everyone up once.
 
 ## Tech Stack
 
@@ -14,8 +18,8 @@ property owners and tenants.
 - **Backend**: Node.js, Express 5, Prisma 7 ORM, Zod validation, JWT in httpOnly cookies
 - **Database**: PostgreSQL (hosted on Supabase)
 - **Payments**: Direct UPI Intent (zero fee) — see [How payments work](#how-payments-work)
-- **File Storage**: Local disk — upload endpoints are **not implemented yet** and
-  return `501 Not Implemented`
+- **File Storage**: Local disk under `UPLOAD_DIR`. Documents are **never** served
+  statically — see [How uploads work](#how-uploads-work)
 
 > The frontend is a **Vite SPA, not Next.js.** It was migrated off Next.js. There is no
 > SSR, no server components, and no `app/` router. `'use client'` does nothing here.
@@ -265,36 +269,79 @@ for `{"status":"ok",...}`.
 | `pnpm lint` | web | ESLint — must be 0 errors |
 | `pnpm build` | both | Type check + compile |
 | `pnpm db:studio` | api | Browse the database in a GUI |
+| `pnpm admin:create <email>` | api | Create a SUPER_ADMIN (cannot be done via signup) |
 
 There is **no test suite yet.** `pnpm lint` and `pnpm build` are the only automated
 checks, so run both before pushing.
 
 ---
 
+## How uploads work
+
+Identity documents (Aadhaar, PAN, selfies) are stored on local disk under `UPLOAD_DIR`.
+They are **never** served statically. Three steps, mirroring an S3 presigned flow:
+
+```
+1. POST /uploads/presigned-url   -> { uploadUrl, fileKey, expiresInSeconds }
+2. PUT  <uploadUrl>              raw file body; no cookie, the signed token authorizes
+3. POST /uploads/confirm         -> creates the Owner/TenantDocument row
+```
+
+`uploadUrl` points back at this API and embeds a short-lived signed token. **The token —
+not any request field — decides where the bytes land**, which is what makes step 2 safe
+without a session cookie (the browser's `fetch()` sends none).
+
+Reads go through `GET /uploads/documents/:documentId`, which allows the owning user, or a
+`SUPER_ADMIN` reviewing verification, and nobody else. Files come back as attachments with
+`Cache-Control: no-store`.
+
+**If you add anything here, do not reintroduce a static mount for `UPLOAD_DIR`.** That was
+the original bug: every document was readable by anyone who guessed a filename.
+
+## Getting an owner verified
+
+Most owner routes require `verificationStatus = VERIFIED`, so a fresh owner account can't
+reach the dashboard until it's approved. The full path is:
+
+1. Owner signs up and uploads documents on the onboarding page — Aadhaar front + back, a
+   selfie, and at least one property document (all four are required).
+2. Owner submits, which moves them to `UNDER_REVIEW`.
+3. A `SUPER_ADMIN` reviews them at **`/admin/owners`** and approves or rejects.
+
+Admins cannot sign up — `auth.validation.ts` restricts self-signup to `OWNER` and
+`TENANT`. Create one with:
+
+```bash
+cd apps/api
+pnpm admin:create you@example.com     # or use the seeded admin@nestos.in
+```
+
+Then sign in at `/login` with that address and open `/admin`. Login is OTP-by-email
+either way, so use an address you can receive mail at — or read the code from the API
+console in development.
+
+To skip the whole gate while developing, open `pnpm db:studio` and set
+`owner_profiles.verificationStatus` to `VERIFIED` directly.
+
 ## Known issues
 
-Actively under development. These are known and **deliberately not yet fixed** — please
-don't file them again, and check here before assuming something you wrote is broken.
+Actively under development. Check here before assuming something you wrote is broken.
 
-### Broken now — you will hit these
-
-| # | Issue | Effect |
-|---|---|---|
-| 1 | `noticesRouter` is mounted at `/owner/notices` **and** `/tenant/notices`, but its own paths are `/owner` and `/tenant`, so real URLs are `/owner/notices/owner`. The web app calls `/owner/notices`. | Notices 404 for both roles. Either fix the mounts in `app.ts` or the paths in `notices.routes.ts` — not both. |
-| 2 | `GET /buildings/search` is registered **after** `/:buildingId`, which matches first. | Property search never reaches its handler. Move it above `/:buildingId`. |
-| 3 | `buildingsRouter.use(authenticate, requireVerifiedOwner)` also covers `/search` and `/:buildingId/public`, which are meant to be public. | Tenants can't search or view properties. Move those two routes to their own router, or apply the guard per-route. |
-| 4 | `POST /auth/refresh-token` is a `501` stub, but the axios interceptor calls it on every 401. | Any expired access token logs the user straight out instead of refreshing silently. |
-| 5 | File uploads (`/uploads/presigned-url`, `/uploads/confirm`) return `501`. | Owner verification and Aadhaar upload can't be completed. The frontend expects an S3-style presigned flow; the backend is configured for local disk. |
-
-### Fix before anyone real uses this
+### Open
 
 | # | Issue |
 |---|---|
-| 6 | `app.ts` serves the whole `UPLOAD_DIR` through **unauthenticated** `express.static`. These are Aadhaar/PAN/selfie documents. **Do not build the upload flow until this is an authenticated route.** |
-| 7 | `pnpm start` is broken: `tsc` doesn't rewrite path aliases, so `dist/index.js` does `require("@config/env")` and crashes. Only affects production builds — `pnpm dev` works via `tsconfig-paths`. Fix with `tsc-alias` or by dropping the aliases. |
-| 8 | `EMAIL_FROM` in `config/env.ts` defaults to a personal Gmail address. Set `EMAIL_FROM` in `.env`. |
 | 9 | No shared types package — `apps/web/src/types/index.ts` mirrors the Prisma schema by hand and will drift. |
-| 10 | No tests and no CI. |
+| 10 | No tests and no CI. `pnpm lint` and `pnpm build` are the only automated checks. |
+| 11 | `dashboardRouter` is mounted at both `/owner/dashboard` and `/tenant/dashboard` while defining `/owner` and `/tenant` paths, so the real URLs double up (`/owner/dashboard/owner`). It works and the frontend matches, but it reads oddly — this is the same shape that made notices 404 before it was fixed. |
+| 12 | The admin UI covers owner verification only. There is no user management, and rejected owners can resubmit only by re-uploading documents. |
+
+### Fixed
+
+Issues 1–8 are resolved on the `fix/known-issues` branch: notices routing, property search
+ordering, public property access for tenants, token refresh, file uploads, the
+unauthenticated document mount, the broken `pnpm start`, and the personal-Gmail
+`EMAIL_FROM` default. See `CLAUDE-FIX.md` for detail.
 
 ---
 

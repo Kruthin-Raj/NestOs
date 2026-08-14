@@ -21,12 +21,49 @@ import {
 
 type BuildingParams = { buildingId: string }
 
+// ─────────────────────────────────────────────────────────────
+// Public / tenant-facing routes.
+//
+// These live on a separate router because buildingsRouter applies
+// requireVerifiedOwner to everything it holds — which previously locked
+// tenants out of property search and property detail. app.ts mounts this
+// router at the same prefix but BEFORE buildingsRouter, so '/search' is
+// matched here instead of being swallowed by '/:buildingId'.
+// ─────────────────────────────────────────────────────────────
+export const publicBuildingsRouter: ReturnType<typeof Router> = Router()
+
+publicBuildingsRouter.get('/search',
+  validateQuery(
+    z.object({
+      city: z.string().optional(), page: z.string().optional(),
+      limit: z.string().optional(), type: z.string().optional(),
+      genderPreference: z.string().optional(),
+    })
+  ),
+  asyncHandler(async (req, res) => {
+    const result = await searchPropertiesService(req.query as Record<string, unknown>)
+    sendSuccess(res, 'Properties found', result)
+  })
+)
+
+// optionalAuth so a logged-in tenant gets personalised data, while an
+// anonymous visitor can still view the listing.
+publicBuildingsRouter.get('/:buildingId/public',
+  optionalAuth,
+  asyncHandler<BuildingParams>(async (req, res) => {
+    const result = await getPublicPropertyService(
+      req.params.buildingId,
+      req.user?.userId
+    )
+    sendSuccess(res, 'Property details fetched', result)
+  })
+)
+
+// ─────────────────────────────────────────────────────────────
+// Owner-only routes — every one requires a VERIFIED owner.
+// ─────────────────────────────────────────────────────────────
 export const buildingsRouter: ReturnType<typeof Router> = Router()
 
-// All building routes require verified owner.
-// NOTE: this also covers '/search' and '/:buildingId/public' below, which read
-// as intended-public (the latter even adds optionalAuth). Route order and
-// middleware are preserved exactly as they were — see the handover notes.
 buildingsRouter.use(authenticate, requireVerifiedOwner)
 
 buildingsRouter.get('/',
@@ -75,38 +112,7 @@ buildingsRouter.delete('/:buildingId',
   })
 )
 
-// NOTE: registered after '/:buildingId', so GET /search is matched by that
-// route first and never reaches this handler. Order preserved from before the
-// refactor — see the handover notes.
-buildingsRouter.get('/search',
-  validateQuery(
-    z.object({
-      city: z.string().optional(), page: z.string().optional(),
-      limit: z.string().optional(), type: z.string().optional(),
-      genderPreference: z.string().optional(),
-    })
-  ),
-  asyncHandler(async (req, res) => {
-    const result = await searchPropertiesService(req.query as Record<string, unknown>)
-    sendSuccess(res, 'Properties found', result)
-  })
-)
-
-buildingsRouter.get('/:buildingId/public',
-  optionalAuth,
-  asyncHandler<BuildingParams>(async (req, res) => {
-    const result = await getPublicPropertyService(
-      req.params.buildingId,
-      req.user?.userId
-    )
-    sendSuccess(res, 'Property details fetched', result)
-  })
-)
-
-// Status change — add after existing routes
 buildingsRouter.patch('/:buildingId/status',
-  authenticate,
-  requireVerifiedOwner,
   validate(z.object({ status: z.enum(['ACTIVE', 'INACTIVE']) })),
   asyncHandler<BuildingParams>(async (req, res) => {
     const result = await updateBuildingStatusService(

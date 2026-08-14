@@ -7,6 +7,13 @@ import { useAuthStore } from '@/store/auth.store'
 import { showToast } from '@/components/ui/toaster'
 import { cn } from '@/lib/utils/cn'
 
+/** Where each role lands after signing in. */
+const HOME_BY_ROLE: Record<string, string> = {
+  SUPER_ADMIN: '/admin',
+  OWNER:       '/owner/dashboard',
+  TENANT:      '/tenant/dashboard',
+}
+
 export default function VerifyOtpPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -54,18 +61,14 @@ export default function VerifyOtpPage() {
       setUser(result.user)
       showToast('Welcome to NestOS!', 'success')
 
-      if (result.user.isNewUser) {
-        if (result.user.role === 'OWNER') {
-          navigate('/owner/onboarding')
-        } else {
-          navigate('/tenant/onboarding')
-        }
+      // Admins cannot self-sign-up, so they never hit the onboarding branch —
+      // but they must not fall through to the tenant dashboard either.
+      if (result.user.isNewUser && result.user.role !== 'SUPER_ADMIN') {
+        navigate(result.user.role === 'OWNER' ? '/owner/onboarding' : '/tenant/onboarding')
       } else if (redirect) {
         navigate(redirect)
       } else {
-        navigate(
-          result.user.role === 'OWNER' ? '/owner/dashboard' : '/tenant/dashboard'
-        )
+        navigate(HOME_BY_ROLE[result.user.role] ?? '/')
       }
     } catch (err: unknown) {
       const errData = (err as { response?: { data?: { message?: string } } })?.response?.data

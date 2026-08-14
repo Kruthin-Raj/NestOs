@@ -44,14 +44,15 @@ export const env = {
   OTP_EXPIRY_MINUTES: parseInt(optionalEnv('OTP_EXPIRY_MINUTES', '10'), 10),
   OTP_MAX_ATTEMPTS: parseInt(optionalEnv('OTP_MAX_ATTEMPTS', '3'), 10),
 
-  // Email
-  RESEND_API_KEY: optionalEnv('RESEND_API_KEY', ''),
-EMAIL_HOST: requireEnv('EMAIL_HOST'),
-EMAIL_PORT: parseInt(optionalEnv('EMAIL_PORT', '587'), 10),
-EMAIL_SECURE: optionalEnv('EMAIL_SECURE', 'false'),
-EMAIL_USER: requireEnv('EMAIL_USER'),
-EMAIL_PASSWORD: requireEnv('EMAIL_PASSWORD'),
-EMAIL_FROM: optionalEnv('EMAIL_FROM', 'PG Management <kruthin123@gmail.com>'),
+  // Email (SMTP via nodemailer — see config/mail.ts)
+  EMAIL_HOST:     requireEnv('EMAIL_HOST'),
+  EMAIL_PORT:     parseInt(optionalEnv('EMAIL_PORT', '587'), 10),
+  EMAIL_SECURE:   optionalEnv('EMAIL_SECURE', 'false'),
+  EMAIL_USER:     requireEnv('EMAIL_USER'),
+  EMAIL_PASSWORD: requireEnv('EMAIL_PASSWORD'),
+  // Required on purpose: this address is what users see as the sender, so a
+  // silent fallback to somebody's personal inbox is worse than failing to boot.
+  EMAIL_FROM:     requireEnv('EMAIL_FROM'),
 
   // Razorpay — REMOVED (using direct UPI payments now)
 
