@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CreditCard, Smartphone } from 'lucide-react'
 import { Card, CardTitle } from '@/components/ui/card'
@@ -78,9 +79,16 @@ export default function TenantPaymentsPage() {
   const payments: Payment[] = data?.items ?? []
   const summary  = data?.summary
   const activeBooking = bookings?.activeBooking as
-    | { id: string; monthlyRent: number; nextRentDue?: string; building?: { name: string } }
+    | {
+        id: string; monthlyRent: number; status?: string; depositPaid?: boolean
+        nextRentDue?: string; building?: { name: string }
+      }
     | null
     | undefined
+
+  // Rent can only be paid once the deposit has confirmed the booking, so show
+  // the deposit prompt instead of a button that would fail with DEPOSIT_NOT_PAID.
+  const depositOutstanding = Boolean(activeBooking && !activeBooking.depositPaid)
 
   return (
     <div className="space-y-6">
@@ -88,7 +96,19 @@ export default function TenantPaymentsPage() {
 
       {/* Pay rent — UPI intent. Opens the tenant's UPI app with the owner's
           VPA, amount and note prefilled; no card data passes through NestOS. */}
-      {activeBooking && (
+      {activeBooking && depositOutstanding && (
+        <Card>
+          <CardTitle className="mb-1">Deposit due</CardTitle>
+          <p className="text-sm text-gray-500 mb-3">
+            Your booking is not confirmed until the security deposit is paid.
+          </p>
+          <Link to="/tenant/bookings">
+            <Button size="sm">Go to my booking</Button>
+          </Link>
+        </Card>
+      )}
+
+      {activeBooking && !depositOutstanding && (
         <Card>
           <CardTitle className="mb-1">Pay rent</CardTitle>
           <p className="text-sm text-gray-500 mb-3">
@@ -109,13 +129,25 @@ export default function TenantPaymentsPage() {
         </Card>
       )}
 
-      {/* Summary */}
-      <Card>
-        <p className="text-xs text-gray-500 mb-1">Total paid</p>
-        <p className="text-2xl font-bold text-gray-900">
-          {formatRupees(summary?.totalPaid ?? 0)}
-        </p>
-      </Card>
+      {/* Summary. Pending is shown separately because a UPI payment stays
+          PENDING until the owner confirms the reference — without it, money the
+          tenant has already sent looks like it vanished. */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <p className="text-xs text-gray-500 mb-1">Total paid</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {formatRupees(summary?.totalPaid ?? 0)}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Confirmed by your owner</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-gray-500 mb-1">Awaiting confirmation</p>
+          <p className="text-2xl font-bold text-amber-600">
+            {formatRupees(summary?.totalPending ?? 0)}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Submit the UPI reference below</p>
+        </Card>
+      </div>
 
       {/* Payment list */}
       {!payments.length ? (

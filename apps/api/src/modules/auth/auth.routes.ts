@@ -1,9 +1,9 @@
 import { Router } from 'express'
 import { authenticate } from '@middleware/auth.middleware'
 import { validate } from '@middleware/validate.middleware'
-import { otpRateLimit } from '@middleware/rate-limit.middleware'
+import { otpRateLimit, strictRateLimit } from '@middleware/rate-limit.middleware'
 import { asyncHandler } from '@utils/async-handler'
-import { sendSuccess } from '@utils/response.util'
+import { sendSuccess, sendCreated } from '@utils/response.util'
 import {
   getAccessTokenCookieOptions,
   getRefreshTokenCookieOptions,
@@ -11,16 +11,85 @@ import {
   clearRefreshTokenCookieOptions,
 } from '@utils/jwt.util'
 import { JWT } from '@config/constants'
-import { sendOtpSchema, verifyOtpSchema } from './auth.validation'
+import {
+  sendOtpSchema, verifyOtpSchema, signupSchema, loginSchema,
+  forgotPasswordSchema, resetPasswordSchema,
+} from './auth.validation'
 import {
   sendOtpService,
   verifyOtpService,
   getCurrentUserService,
   refreshTokensService,
   logoutService,
+  signupService,
+  loginService,
+  forgotPasswordService,
+  resetPasswordService,
 } from './auth.service'
 
 export const authRouter: ReturnType<typeof Router> = Router()
+
+/** Sets the auth cookies for a freshly issued session. */
+function setSessionCookies(
+  res: import('express').Response,
+  tokens: { accessToken: string; refreshToken: string }
+) {
+  res.cookie(JWT.ACCESS_COOKIE_NAME, tokens.accessToken, getAccessTokenCookieOptions())
+  res.cookie(JWT.REFRESH_COOKIE_NAME, tokens.refreshToken, getRefreshTokenCookieOptions())
+}
+
+// POST /api/v1/auth/signup
+// Creates the account with a password and emails a code to confirm the address.
+authRouter.post('/signup',
+  otpRateLimit,
+  validate(signupSchema),
+  asyncHandler(async (req, res) => {
+    const result = await signupService(req.body)
+    sendCreated(res, 'Account created. Enter the code we emailed you.', result)
+  })
+)
+
+// POST /api/v1/auth/login — email + password, no OTP.
+authRouter.post('/login',
+  strictRateLimit,
+  validate(loginSchema),
+  asyncHandler(async (req, res) => {
+    const result = await loginService(req.body)
+    setSessionCookies(res, result)
+    sendSuccess(res, 'Login successful', {
+      user:        result.user,
+      accessToken: result.accessToken,
+      expiresIn:   result.expiresIn,
+    })
+  })
+)
+
+// POST /api/v1/auth/forgot-password
+// Always reports success, so it cannot be used to discover registered emails.
+authRouter.post('/forgot-password',
+  otpRateLimit,
+  validate(forgotPasswordSchema),
+  asyncHandler(async (req, res) => {
+    const result = await forgotPasswordService(req.body)
+    sendSuccess(res, 'If that email is registered, a reset code is on its way.', result)
+  })
+)
+
+// POST /api/v1/auth/reset-password
+// Also the way an account created before password login sets its first one.
+authRouter.post('/reset-password',
+  strictRateLimit,
+  validate(resetPasswordSchema),
+  asyncHandler(async (req, res) => {
+    const result = await resetPasswordService(req.body)
+    setSessionCookies(res, result)
+    sendSuccess(res, 'Password updated', {
+      user:        result.user,
+      accessToken: result.accessToken,
+      expiresIn:   result.expiresIn,
+    })
+  })
+)
 
 // POST /api/v1/auth/send-otp
 authRouter.post('/send-otp',
@@ -38,10 +107,9 @@ authRouter.post('/verify-otp',
   asyncHandler(async (req, res) => {
     const result = await verifyOtpService(req.body)
 
-    res.cookie(JWT.ACCESS_COOKIE_NAME, result.accessToken, getAccessTokenCookieOptions())
-    res.cookie(JWT.REFRESH_COOKIE_NAME, result.refreshToken, getRefreshTokenCookieOptions())
+    setSessionCookies(res, result)
 
-    sendSuccess(res, 'Login successful', {
+    sendSuccess(res, 'Email verified', {
       user: result.user,
       accessToken: result.accessToken,
       expiresIn: result.expiresIn,

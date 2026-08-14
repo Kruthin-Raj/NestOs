@@ -14,11 +14,13 @@ import NotFoundPage from '@/pages/NotFound'
 import LoginPage from '@/pages/auth/Login'
 import SignupPage from '@/pages/auth/Signup'
 import VerifyOtpPage from '@/pages/auth/VerifyOtp'
+import ForgotPasswordPage from '@/pages/auth/ForgotPassword'
 
 // Tenant
 import TenantDashboard from '@/pages/tenant/Dashboard'
 import TenantSearch from '@/pages/tenant/Search'
 import TenantPropertyDetail from '@/pages/tenant/PropertyDetail'
+import TenantBookings from '@/pages/tenant/Bookings'
 import TenantPayments from '@/pages/tenant/Payments'
 import TenantIssues from '@/pages/tenant/Issues'
 import TenantIssueDetail from '@/pages/tenant/IssueDetail'
@@ -60,6 +62,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/verify-otp" element={<VerifyOtpPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
 
       {/* Tenant Dashboard */}
@@ -69,6 +72,7 @@ export default function App() {
         <Route path="dashboard" element={<TenantDashboard />} />
         <Route path="search" element={<TenantSearch />} />
         <Route path="property/:buildingId" element={<TenantPropertyDetail />} />
+        <Route path="bookings" element={<TenantBookings />} />
         <Route path="payments" element={<TenantPayments />} />
         <Route path="issues" element={<TenantIssues />} />
         <Route path="issues/:issueId" element={<TenantIssueDetail />} />

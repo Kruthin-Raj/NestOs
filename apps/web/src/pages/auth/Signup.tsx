@@ -5,7 +5,8 @@ import { Building2, Users, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { sendOtp } from '@/features/auth/services/auth.service'
+import { signup } from '@/features/auth/services/auth.service'
+import { passwordField } from '@/lib/utils/password'
 import { showToast } from '@/components/ui/toaster'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,7 +17,8 @@ import { FormField } from '@/components/ui/form-field'
 type RoleOption = 'OWNER' | 'TENANT'
 
 const schema = z.object({
-  email: z.string().email('Enter a valid email address'),
+  email:    z.string().email('Enter a valid email address'),
+  password: passwordField,
 })
 type FormValues = z.infer<typeof schema>
 
@@ -60,17 +62,21 @@ export default function SignupPage() {
     if (!role) return
     setLoading(true)
     try {
-      await sendOtp(values.email, role)
-      showToast('OTP sent to your email', 'success')
+      await signup(values.email, values.password, role)
+      showToast('Account created — enter the code we emailed you', 'success')
       navigate(
         `/verify-otp?email=${encodeURIComponent(values.email)}&role=${role}&isNew=1`
       )
     } catch (err: unknown) {
       const errData = (err as { response?: { data?: { message?: string; error?: { code?: string } } } })?.response?.data
-      if (errData?.error?.code === 'ROLE_MISMATCH') {
+      const code = errData?.error?.code
+      if (code === 'ROLE_MISMATCH') {
         showToast('This email is already registered with a different role. Please log in instead.', 'error')
+      } else if (code === 'EMAIL_IN_USE') {
+        showToast('That email already has an account — sign in instead.', 'error')
+        navigate(`/login?email=${encodeURIComponent(values.email)}`)
       } else {
-        showToast(errData?.message ?? 'Failed to send OTP', 'error')
+        showToast(errData?.message ?? 'Could not create your account', 'error')
       }
     } finally {
       setLoading(false)
@@ -82,7 +88,7 @@ export default function SignupPage() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
         <p className="mt-1 text-sm text-gray-500">
-          {step === 'role' ? 'How will you use NestOS?' : 'Enter your email to get started'}
+          {step === 'role' ? 'How will you use NestOS?' : 'Choose an email and password'}
         </p>
       </div>
 
@@ -146,9 +152,25 @@ export default function SignupPage() {
                 autoFocus
               />
             </FormField>
+            <FormField
+              label="Password"
+              error={errors.password?.message}
+              required
+              hint="At least 8 characters, with a letter and a number"
+            >
+              <Input
+                {...register('password')}
+                type="password"
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </FormField>
             <Button type="submit" className="w-full" loading={loading}>
-              Continue with Email
+              Create account
             </Button>
+            <p className="text-xs text-gray-400 text-center">
+              We will email you a 6-digit code to confirm your address.
+            </p>
           </form>
         </Card>
       )}

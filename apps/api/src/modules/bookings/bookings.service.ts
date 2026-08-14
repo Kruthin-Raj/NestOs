@@ -170,10 +170,14 @@ export async function getMyBookingsService(
 
   if (!tenantProfile) throw new NotFoundError('Tenant profile not found')
 
+  // PENDING counts as active: that is a booking awaiting its deposit, and the
+  // bed is already held for it. Filtering to CONFIRMED here meant a freshly
+  // made booking appeared in neither list, so the tenant could not see it at
+  // all — pastBookings excludes PENDING too.
   const activeBooking = await prisma.booking.findFirst({
     where: {
       tenantId: tenantProfile.id,
-      status: 'CONFIRMED',
+      status: { in: ['PENDING', 'CONFIRMED'] },
     },
     orderBy: { createdAt: 'desc' },
   })

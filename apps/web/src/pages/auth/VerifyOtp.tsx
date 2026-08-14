@@ -6,13 +6,7 @@ import { verifyOtp, sendOtp } from '@/features/auth/services/auth.service'
 import { useAuthStore } from '@/store/auth.store'
 import { showToast } from '@/components/ui/toaster'
 import { cn } from '@/lib/utils/cn'
-
-/** Where each role lands after signing in. */
-const HOME_BY_ROLE: Record<string, string> = {
-  SUPER_ADMIN: '/admin',
-  OWNER:       '/owner/dashboard',
-  TENANT:      '/tenant/dashboard',
-}
+import { HOME_BY_ROLE } from '@/lib/utils/auth-routes'
 
 export default function VerifyOtpPage() {
   const navigate = useNavigate()

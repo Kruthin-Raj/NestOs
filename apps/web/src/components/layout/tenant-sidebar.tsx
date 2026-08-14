@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Search, CreditCard,
-  AlertCircle, Bell, Settings, LogOut, X,
+  AlertCircle, Bell, Settings, LogOut, X, BedDouble,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { useUIStore } from '@/store/ui.store'
@@ -14,6 +14,7 @@ import apiClient from '@/lib/api/client'
 const BASE_NAV = [
   { href: '/tenant/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tenant/search',    icon: Search,          label: 'Find a PG' },
+  { href: '/tenant/bookings',  icon: BedDouble,       label: 'My booking' },
   { href: '/tenant/payments',  icon: CreditCard,      label: 'Payments' },
   { href: '/tenant/issues',    icon: AlertCircle,     label: 'Issues' },
   { href: '/tenant/notices',   icon: Bell,            label: 'Notices' },

@@ -194,6 +194,10 @@ model User {
   email           String    @unique
   phone           String?   @unique
   role            UserRole
+  // Nullable on purpose: accounts created before password login existed have no
+  // password. Login detects that and sends them through the reset flow rather
+  // than failing, so no data migration is needed.
+  passwordHash    String?
   isEmailVerified Boolean   @default(false)
   isPhoneVerified Boolean   @default(false)
   isActive        Boolean   @default(true)
