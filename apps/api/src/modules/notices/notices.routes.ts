@@ -3,7 +3,15 @@ import { z } from 'zod'
 import { authenticate } from '@middleware/auth.middleware'
 import { isTenant, requireVerifiedOwner } from '@middleware/rbac.middleware'
 import { validate } from '@middleware/validate.middleware'
-import { createNotice, getOwnerNotices, deleteNotice, getTenantNotices, markNoticeRead } from './notices.controller'
+import { asyncHandler } from '@utils/async-handler'
+import { sendSuccess, sendCreated, sendNoContent } from '@utils/response.util'
+import {
+  createNoticeService,
+  getOwnerNoticesService,
+  deleteNoticeService,
+  getTenantNoticesService,
+  markNoticeReadService,
+} from './notices.service'
 
 const createNoticeSchema = z.object({
   title:            z.string().min(5).max(255).trim(),
@@ -19,12 +27,66 @@ const createNoticeSchema = z.object({
   sendEmail:        z.boolean().optional(),
 })
 
-export const noticesRouter: ReturnType<typeof Router> = Router()
-// Owner routes
-noticesRouter.post('/',            authenticate, requireVerifiedOwner, validate(createNoticeSchema), createNotice)
-noticesRouter.get('/owner',        authenticate, requireVerifiedOwner, getOwnerNotices)
-noticesRouter.delete('/owner/:noticeId', authenticate, requireVerifiedOwner, deleteNotice)
+type NoticeParams = { noticeId: string }
 
-// Tenant routes
-noticesRouter.get('/tenant',        authenticate, isTenant, getTenantNotices)
-noticesRouter.post('/tenant/:noticeId/read', authenticate, isTenant, markNoticeRead)
+// ─────────────────────────────────────────────────────────────
+// Two routers, one per role.
+//
+// Previously a single router held '/owner' and '/tenant' paths and was mounted
+// at BOTH /owner/notices and /tenant/notices, so the real URLs came out as
+// /owner/notices/owner. The web client calls /owner/notices, so every notices
+// request 404'd. Paths are now relative to their mount point.
+// ─────────────────────────────────────────────────────────────
+
+export const ownerNoticesRouter: ReturnType<typeof Router> = Router()
+ownerNoticesRouter.use(authenticate, requireVerifiedOwner)
+
+// GET /api/v1/owner/notices
+ownerNoticesRouter.get('/',
+  asyncHandler(async (req, res) => {
+    const result = await getOwnerNoticesService(
+      req.resourceOwnerId!,
+      req.query as Record<string, unknown>
+    )
+    sendSuccess(res, 'Notices fetched', result)
+  })
+)
+
+// POST /api/v1/owner/notices
+ownerNoticesRouter.post('/',
+  validate(createNoticeSchema),
+  asyncHandler(async (req, res) => {
+    const result = await createNoticeService(req.resourceOwnerId!, req.body)
+    sendCreated(res, 'Notice created', result)
+  })
+)
+
+// DELETE /api/v1/owner/notices/:noticeId
+ownerNoticesRouter.delete('/:noticeId',
+  asyncHandler<NoticeParams>(async (req, res) => {
+    await deleteNoticeService(req.params.noticeId, req.resourceOwnerId!)
+    sendNoContent(res)
+  })
+)
+
+export const tenantNoticesRouter: ReturnType<typeof Router> = Router()
+tenantNoticesRouter.use(authenticate, isTenant)
+
+// GET /api/v1/tenant/notices
+tenantNoticesRouter.get('/',
+  asyncHandler(async (req, res) => {
+    const result = await getTenantNoticesService(
+      req.user!.userId,
+      req.query as Record<string, unknown>
+    )
+    sendSuccess(res, 'Notices fetched', result)
+  })
+)
+
+// POST /api/v1/tenant/notices/:noticeId/read
+tenantNoticesRouter.post('/:noticeId/read',
+  asyncHandler<NoticeParams>(async (req, res) => {
+    const result = await markNoticeReadService(req.params.noticeId, req.user!.userId)
+    sendSuccess(res, 'Notice marked as read', result)
+  })
+)

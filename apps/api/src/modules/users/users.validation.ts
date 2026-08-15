@@ -1,59 +1,57 @@
 import { z } from 'zod'
-
-const indianPhone = z
-  .string()
-  .regex(/^\+91[6-9]\d{9}$/, 'Must be a valid Indian mobile number (+91XXXXXXXXXX)')
+import { optional, phoneNumber } from '@utils/zod.util'
 
 export const updateOwnerProfileSchema = z.object({
-  fullName:     z.string().min(2).max(255).trim().optional(),
-  businessName: z.string().max(255).trim().optional(),
-  phone:        indianPhone.optional(),
-  city:         z.string().max(100).trim().optional(),
-  state:        z.string().max(100).trim().optional(),
+  fullName:     optional(z.string().min(2).max(255).trim()),
+  businessName: optional(z.string().max(255).trim()),
+  phone:        optional(phoneNumber),
+  city:         optional(z.string().max(100).trim()),
+  state:        optional(z.string().max(100).trim()),
+  upiId:        optional(z.string().max(255).trim()),
 }).refine(
-  (data) => Object.keys(data).length > 0,
+  (data) => Object.values(data).some((v) => v !== undefined),
   { message: 'At least one field must be provided' }
 )
 
 export const updateTenantProfileSchema = z.object({
-  fullName:           z.string().min(2).max(255).trim().optional(),
-  phone:              indianPhone.optional(),
-  dateOfBirth:        z.string()
-    .refine((d) => {
+  fullName:           optional(z.string().min(2).max(255).trim()),
+  phone:              optional(phoneNumber),
+  dateOfBirth:        optional(
+    z.string().refine((d) => {
       const dob = new Date(d)
       const age = (Date.now() - dob.getTime()) / (365.25 * 24 * 3600 * 1000)
       return age >= 18
     }, 'Must be at least 18 years old')
-    .optional(),
-  gender:             z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT']).optional(),
-  profession:         z.enum(['STUDENT', 'WORKING_PROFESSIONAL', 'OTHER']).optional(),
-  employerOrCollege:  z.string().max(255).trim().optional(),
-  city:               z.string().max(100).trim().optional(),
-  emergencyName:      z.string().max(255).trim().optional(),
-  emergencyPhone:     indianPhone.optional(),
-  emergencyRelation:  z.string().max(100).trim().optional(),
+  ),
+  gender:             optional(z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT'])),
+  profession:         optional(z.enum(['STUDENT', 'WORKING_PROFESSIONAL', 'OTHER'])),
+  employerOrCollege:  optional(z.string().max(255).trim()),
+  city:               optional(z.string().max(100).trim()),
+  emergencyName:      optional(z.string().max(255).trim()),
+  emergencyPhone:     optional(phoneNumber),
+  emergencyRelation:  optional(z.string().max(100).trim()),
 }).refine(
-  (data) => Object.keys(data).length > 0,
+  (data) => Object.values(data).some((v) => v !== undefined),
   { message: 'At least one field must be provided' }
 )
 
 export const updatePreferencesSchema = z.object({
-  smoking:              z.enum(['NEVER', 'OCCASIONALLY', 'REGULARLY']).optional(),
-  drinking:             z.enum(['NEVER', 'OCCASIONALLY', 'REGULARLY']).optional(),
-  foodPreference:       z.enum(['VEG', 'NON_VEG', 'EGGETARIAN', 'JAIN', 'ANY']).optional(),
-  sleepSchedule:        z.enum(['EARLY_BIRD', 'NIGHT_OWL', 'FLEXIBLE']).optional(),
-  workSchedule:         z.enum(['WORK_FROM_HOME', 'OFFICE', 'STUDENT', 'MIXED']).optional(),
-  cleanlinessLevel:     z.enum(['VERY_CLEAN', 'MODERATE', 'RELAXED']).optional(),
-  noiseLevel:           z.enum(['SILENT', 'MODERATE', 'LOUD_OK']).optional(),
-  guestsAllowed:        z.enum(['NEVER', 'OCCASIONALLY', 'OFTEN']).optional(),
+  smoking:              optional(z.enum(['NEVER', 'OCCASIONALLY', 'REGULARLY'])),
+  drinking:             optional(z.enum(['NEVER', 'OCCASIONALLY', 'REGULARLY'])),
+  foodPreference:       optional(z.enum(['VEG', 'NON_VEG', 'EGGETARIAN', 'JAIN', 'ANY'])),
+  sleepSchedule:        optional(z.enum(['EARLY_BIRD', 'NIGHT_OWL', 'FLEXIBLE'])),
+  workSchedule:         optional(z.enum(['WORK_FROM_HOME', 'OFFICE', 'STUDENT', 'MIXED'])),
+  cleanlinessLevel:     optional(z.enum(['VERY_CLEAN', 'MODERATE', 'RELAXED'])),
+  noiseLevel:           optional(z.enum(['SILENT', 'MODERATE', 'LOUD_OK'])),
+  guestsAllowed:        optional(z.enum(['NEVER', 'OCCASIONALLY', 'OFTEN'])),
   petsAllowed:          z.boolean().optional(),
-  preferredGender:      z.enum(['MALE', 'FEMALE', 'ANY']).optional(),
-  preferredSmoking:     z.enum(['NEVER', 'OCCASIONALLY', 'ANY']).optional(),
-  preferredFoodPref:    z.enum(['VEG', 'NON_VEG', 'ANY']).optional(),
-  preferredSleepSchedule: z.enum(['EARLY_BIRD', 'NIGHT_OWL', 'FLEXIBLE', 'ANY']).optional(),
-  preferredCleanliness: z.enum(['VERY_CLEAN', 'MODERATE', 'ANY']).optional(),
-  personalIcks:         z.string().max(1000).optional(),
-  compatibilityBio:     z.string().max(500).optional(),
+  preferredGender:      optional(z.enum(['MALE', 'FEMALE', 'ANY'])),
+  preferredSmoking:     optional(z.enum(['NEVER', 'OCCASIONALLY', 'ANY'])),
+  preferredFoodPref:    optional(z.enum(['VEG', 'NON_VEG', 'ANY'])),
+  preferredSleepSchedule: optional(z.enum(['EARLY_BIRD', 'NIGHT_OWL', 'FLEXIBLE', 'ANY'])),
+  preferredCleanliness: optional(z.enum(['VERY_CLEAN', 'MODERATE', 'ANY'])),
+  personalIcks:         optional(z.string().max(1000)),
+  compatibilityBio:     optional(z.string().max(500)),
 })
 
 export type UpdateOwnerProfileDto  = z.infer<typeof updateOwnerProfileSchema>

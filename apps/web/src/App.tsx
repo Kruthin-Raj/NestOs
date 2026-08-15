@@ -1,39 +1,53 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 
 // Layouts
-import MarketingLayout from './app/(marketing)/layout'
-import AuthLayout from './app/(auth)/layout'
-import TenantLayout from './app/(tenant)/layout'
-import OwnerLayout from './app/(owner)/layout'
+import MarketingLayout from '@/layouts/MarketingLayout'
+import AuthLayout from '@/layouts/AuthLayout'
+import TenantLayout from '@/layouts/TenantLayout'
+import OwnerLayout from '@/layouts/OwnerLayout'
 
-// Marketing Pages
-import HomePage from './app/(marketing)/page'
+// Marketing
+import HomePage from '@/pages/Home'
+import NotFoundPage from '@/pages/NotFound'
 
-// Auth Pages
-import LoginPage from './app/(auth)/login/page'
-import SignupPage from './app/(auth)/signup/page'
-import VerifyOtpPage from './app/(auth)/verify-otp/page'
+// Auth
+import LoginPage from '@/pages/auth/Login'
+import SignupPage from '@/pages/auth/Signup'
+import VerifyOtpPage from '@/pages/auth/VerifyOtp'
+import ForgotPasswordPage from '@/pages/auth/ForgotPassword'
 
-// Tenant Pages
-import TenantDashboard from './app/(tenant)/tenant/dashboard/page'
-import TenantSearch from './app/(tenant)/tenant/search/page'
-import TenantPropertyDetail from './app/(tenant)/tenant/property/[buildingId]/page'
-import TenantPayments from './app/(tenant)/tenant/payments/page'
-import TenantIssues from './app/(tenant)/tenant/issues/page'
-import TenantIssueDetail from './app/(tenant)/tenant/issues/[issuesId]/page'
-import TenantOnboarding from './app/(tenant)/tenant/onboarding/page'
+// Tenant
+import TenantDashboard from '@/pages/tenant/Dashboard'
+import TenantSearch from '@/pages/tenant/Search'
+import TenantPropertyDetail from '@/pages/tenant/PropertyDetail'
+import TenantBookings from '@/pages/tenant/Bookings'
+import TenantPayments from '@/pages/tenant/Payments'
+import TenantIssues from '@/pages/tenant/Issues'
+import TenantIssueDetail from '@/pages/tenant/IssueDetail'
+import TenantNotices from '@/pages/tenant/Notices'
+import TenantSettings from '@/pages/tenant/Settings'
+import TenantOnboarding from '@/pages/tenant/Onboarding'
 
-// Owner Pages
-import OwnerDashboard from './app/(owner)/owner/dashboard/page'
-import OwnerBuildings from './app/(owner)/owner/buildings/page'
-import OwnerBuildingNew from './app/(owner)/owner/buildings/new/page'
-import OwnerBuildingDetail from './app/(owner)/owner/buildings/[buildingId]/page'
-import OwnerRooms from './app/(owner)/owner/buildings/[buildingId]/rooms/page'
-import OwnerRoomDetail from './app/(owner)/owner/buildings/[buildingId]/rooms/[roomId]/page'
-import OwnerTenants from './app/(owner)/owner/tenants/page'
-import OwnerIssues from './app/(owner)/owner/issues/page'
-import OwnerIssueDetail from './app/(owner)/owner/issues/[issuesId]/page'
-import OwnerOnboarding from './app/(owner)/owner/onboarding/page'
+// Owner
+import OwnerDashboard from '@/pages/owner/Dashboard'
+import OwnerBuildings from '@/pages/owner/Buildings'
+import OwnerBuildingNew from '@/pages/owner/BuildingNew'
+import OwnerBuildingDetail from '@/pages/owner/BuildingDetail'
+import OwnerBuildingEdit from '@/pages/owner/BuildingEdit'
+import OwnerRooms from '@/pages/owner/Rooms'
+import OwnerRoomDetail from '@/pages/owner/RoomDetail'
+import OwnerTenants from '@/pages/owner/Tenants'
+import OwnerIssues from '@/pages/owner/Issues'
+import OwnerIssueDetail from '@/pages/owner/IssueDetail'
+import OwnerPayments from '@/pages/owner/Payments'
+import OwnerNotices from '@/pages/owner/Notices'
+import OwnerSettings from '@/pages/owner/Settings'
+import OwnerOnboarding from '@/pages/owner/Onboarding'
+
+// Admin
+import AdminLayout from '@/layouts/AdminLayout'
+import AdminPendingOwners from '@/pages/admin/PendingOwners'
+import AdminPendingTenants from '@/pages/admin/PendingTenants'
 
 export default function App() {
   return (
@@ -48,6 +62,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/verify-otp" element={<VerifyOtpPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
 
       {/* Tenant Dashboard */}
@@ -57,9 +72,12 @@ export default function App() {
         <Route path="dashboard" element={<TenantDashboard />} />
         <Route path="search" element={<TenantSearch />} />
         <Route path="property/:buildingId" element={<TenantPropertyDetail />} />
+        <Route path="bookings" element={<TenantBookings />} />
         <Route path="payments" element={<TenantPayments />} />
         <Route path="issues" element={<TenantIssues />} />
-        <Route path="issues/:issuesId" element={<TenantIssueDetail />} />
+        <Route path="issues/:issueId" element={<TenantIssueDetail />} />
+        <Route path="notices" element={<TenantNotices />} />
+        <Route path="settings" element={<TenantSettings />} />
       </Route>
 
       {/* Owner Dashboard */}
@@ -70,12 +88,26 @@ export default function App() {
         <Route path="buildings" element={<OwnerBuildings />} />
         <Route path="buildings/new" element={<OwnerBuildingNew />} />
         <Route path="buildings/:buildingId" element={<OwnerBuildingDetail />} />
+        <Route path="buildings/:buildingId/edit" element={<OwnerBuildingEdit />} />
         <Route path="buildings/:buildingId/rooms" element={<OwnerRooms />} />
         <Route path="buildings/:buildingId/rooms/:roomId" element={<OwnerRoomDetail />} />
         <Route path="tenants" element={<OwnerTenants />} />
         <Route path="issues" element={<OwnerIssues />} />
-        <Route path="issues/:issuesId" element={<OwnerIssueDetail />} />
+        <Route path="issues/:issueId" element={<OwnerIssueDetail />} />
+        <Route path="payments" element={<OwnerPayments />} />
+        <Route path="notices" element={<OwnerNotices />} />
+        <Route path="settings" element={<OwnerSettings />} />
       </Route>
+
+      {/* Admin — SUPER_ADMIN only. AdminLayout redirects everyone else. */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="owners" replace />} />
+        <Route path="owners" element={<AdminPendingOwners />} />
+        <Route path="tenants" element={<AdminPendingTenants />} />
+      </Route>
+
+      {/* Catch-all */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

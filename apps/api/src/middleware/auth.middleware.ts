@@ -65,7 +65,8 @@ export function optionalAuth(
       }
     }
   } catch {
-    // Silently ignore invalid tokens on optional auth routes
+    // Silently ignore invalid tokens on optional auth routes and hi
   }
   next()
 }
+

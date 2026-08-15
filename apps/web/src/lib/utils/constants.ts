@@ -36,7 +36,10 @@ export const NOTICE_CATEGORIES = [
 
 export const QUERY_KEYS = {
   auth: {
-    me: () => ['auth', 'me'] as const,
+    me:      () => ['auth', 'me'] as const,
+    // /auth/me returns a thin projection (no phone, city, preferences...).
+    // Forms that edit the profile need the full record from /users/profile.
+    profile: () => ['auth', 'profile'] as const,
   },
   buildings: {
     all:    ()           => ['buildings'] as const,

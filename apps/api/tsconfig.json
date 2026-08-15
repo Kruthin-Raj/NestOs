@@ -22,5 +22,12 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "prisma"]
+  "exclude": ["node_modules", "dist", "prisma"],
+  "ts-node": {
+    // ts-node defaults to files:false and compiles only the entry import graph,
+    // which skips src/types/express.d.ts. That file globally augments
+    // Express.Request with `user` and `resourceOwnerId`, so without this the
+    // routers fail to compile under `pnpm dev` even though `tsc --noEmit` passes.
+    "files": true
+  }
 }

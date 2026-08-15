@@ -1,5 +1,4 @@
 import express, { Application } from 'express'
-import path from 'path'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -15,7 +14,7 @@ import { authRouter } from '@modules/auth/auth.routes'
 import { usersRouter } from '@modules/users/users.routes'
 import { uploadsRouter } from '@modules/uploads/uploads.routes'
 import { ownerVerificationRouter } from '@modules/owner-verification/owner-verification.routes'
-import { buildingsRouter } from '@modules/buildings/buildings.routes'
+import { buildingsRouter, publicBuildingsRouter } from '@modules/buildings/buildings.routes'
 import { floorsRouter } from '@modules/floors/floors.routes'
 import { roomsRouter } from '@modules/rooms/rooms.routes'
 import { bedsRouter } from '@modules/beds/beds.routes'
@@ -23,7 +22,7 @@ import { tenantsRouter } from '@modules/tenants/tenants.routes'
 import { bookingsRouter } from '@modules/bookings/bookings.routes'
 import { paymentsRouter } from '@modules/payments/payments.routes'
 import { issuesRouter } from '@modules/issues/issues.routes'
-import { noticesRouter } from '@modules/notices/notices.routes'
+import { ownerNoticesRouter, tenantNoticesRouter } from '@modules/notices/notices.routes'
 import { dashboardRouter } from '@modules/dashboard/dashboard.routes'
 import { adminRouter } from '@modules/admin/admin.routes'
 
@@ -47,8 +46,14 @@ export function createApp(): Application {
   app.use(express.json({ limit: '10mb' }))
   app.use(express.urlencoded({ extended: true }))
 
-  // ── Serve uploaded files statically ─────────────────────
-  app.use('/uploads', express.static(path.resolve(env.UPLOAD_DIR)))
+  // ── Uploaded files are NOT served statically ─────────────
+  // They are Aadhaar/PAN/selfie documents. This used to be
+  //   app.use('/uploads', express.static(path.resolve(env.UPLOAD_DIR)))
+  // which exposed every document to anyone who guessed a filename, with no
+  // authentication whatsoever. Reads now go through
+  // GET /api/v1/uploads/documents/:documentId, which checks that the caller
+  // owns the document (or is an admin reviewing verification).
+  // Do not reintroduce a static mount here.
 
   // ── Cookie parser ─────────────────────────────────────────
   app.use(cookieParser())
@@ -84,6 +89,10 @@ export function createApp(): Application {
   app.use(`${API_PREFIX}/users`,             usersRouter)
   app.use(`${API_PREFIX}/uploads`,           uploadsRouter)
   app.use(`${API_PREFIX}/owner/verification`,ownerVerificationRouter)
+  // Public building routes MUST be mounted before buildingsRouter: the latter
+  // guards everything with requireVerifiedOwner and defines '/:buildingId',
+  // which would otherwise match '/search' first.
+  app.use(`${API_PREFIX}/buildings`,         publicBuildingsRouter)
   app.use(`${API_PREFIX}/buildings`,         buildingsRouter)
   app.use(`${API_PREFIX}/buildings`,         floorsRouter)   // /buildings/:id/floors
   app.use(`${API_PREFIX}/buildings`,         roomsRouter)    // /buildings/:id/rooms
@@ -92,8 +101,8 @@ export function createApp(): Application {
   app.use(`${API_PREFIX}/bookings`,          bookingsRouter)
   app.use(`${API_PREFIX}/payments`,          paymentsRouter)
   app.use(`${API_PREFIX}/issues`,            issuesRouter)
-  app.use(`${API_PREFIX}/owner/notices`,     noticesRouter)
-  app.use(`${API_PREFIX}/tenant/notices`,    noticesRouter)
+  app.use(`${API_PREFIX}/owner/notices`,     ownerNoticesRouter)
+  app.use(`${API_PREFIX}/tenant/notices`,    tenantNoticesRouter)
   app.use(`${API_PREFIX}/owner/dashboard`,   dashboardRouter)
   app.use(`${API_PREFIX}/tenant/dashboard`,  dashboardRouter)
   app.use(`${API_PREFIX}/admin`,             adminRouter)

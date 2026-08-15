@@ -1,9 +1,8 @@
-'use client'
 import { Link } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  AlertCircle, Bell, Settings, LogOut, Menu, X,
+  AlertCircle, Bell, Settings, LogOut, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { useUIStore } from '@/store/ui.store'
@@ -23,7 +22,7 @@ const NAV_ITEMS = [
 export function OwnerSidebar() {
   const location = useLocation()
   const pathname = location.pathname
-  const { sidebarOpen, toggleSidebar, closeSidebar } = useUIStore()
+  const { sidebarOpen, closeSidebar } = useUIStore()
   const user        = useAuthStore((s) => s.user)
   const { mutate: doLogout } = useLogout()
 

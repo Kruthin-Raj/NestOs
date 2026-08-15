@@ -1,3 +1,7 @@
+allowBuilds:
+  # esbuild ships a platform binary and needs its postinstall to run,
+  # otherwise `vite build` fails on a fresh install.
+  esbuild: true
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
