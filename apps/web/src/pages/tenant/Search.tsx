@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Search, MapPin } from 'lucide-react'
+import { Search, MapPin, LocateFixed, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
@@ -13,19 +13,69 @@ import { CardSkeleton } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
 import { formatRupees } from '@/lib/utils/format'
 import { QUERY_KEYS } from '@/lib/utils/constants'
+import { showToast } from '@/components/ui/toaster'
 
 interface SearchFilters {
   city:             string
   genderPreference: string
   minRent:          string
   maxRent:          string
+  /** Set together to switch the API into proximity search. */
+  lat:              string
+  lng:              string
+  radiusKm:         string
 }
+
+const RADIUS_OPTIONS = ['2', '5', '10', '25', '50']
 
 export default function SearchPage() {
   const [filters, setFilters] = useState<SearchFilters>({
     city: '', genderPreference: '', minRent: '', maxRent: '',
+    lat: '', lng: '', radiusKm: '10',
   })
   const [applied, setApplied] = useState<SearchFilters>(filters)
+  const [locating, setLocating] = useState(false)
+
+  const usingLocation = Boolean(applied.lat && applied.lng)
+
+  /**
+   * Asks the browser for a fix and searches from it.
+   *
+   * Requires HTTPS in production; localhost is exempt. Denial is a normal
+   * outcome, not an error — fall back to searching by city.
+   */
+  function searchNearMe() {
+    if (!navigator.geolocation) {
+      showToast('This browser cannot share your location — search by city instead.', 'error')
+      return
+    }
+
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const next = {
+          ...filters,
+          lat: String(pos.coords.latitude),
+          lng: String(pos.coords.longitude),
+          city: '',
+        }
+        setFilters(next)
+        setApplied(next)
+        setLocating(false)
+      },
+      () => {
+        showToast('Could not get your location. Allow access, or search by city.', 'error')
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  function clearLocation() {
+    const next = { ...filters, lat: '', lng: '' }
+    setFilters(next)
+    setApplied(next)
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.properties.search(applied),
@@ -58,7 +108,40 @@ export default function SearchPage() {
             />
           </div>
           <Button onClick={() => setApplied({ ...filters })}>Search</Button>
+          <Button variant="outline" loading={locating} onClick={searchNearMe}>
+            <LocateFixed className="h-4 w-4 mr-1" />
+            Near me
+          </Button>
         </div>
+
+        {usingLocation && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-teal-50 border border-teal-200 px-3 py-2">
+            <MapPin className="h-4 w-4 text-teal-700" />
+            <span className="text-sm text-teal-800">
+              Showing places within
+            </span>
+            <select
+              value={filters.radiusKm}
+              onChange={(e) => {
+                const next = { ...filters, radiusKm: e.target.value }
+                setFilters(next)
+                setApplied(next)
+              }}
+              className="h-8 rounded-lg border border-teal-300 bg-white px-2 text-sm"
+            >
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r} km</option>
+              ))}
+            </select>
+            <span className="text-sm text-teal-800">of you, nearest first</span>
+            <button
+              onClick={clearLocation}
+              className="ml-auto flex items-center gap-1 text-xs text-teal-700 hover:underline"
+            >
+              <X className="h-3 w-3" /> Clear
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-3 mt-3">
           <Select
@@ -95,7 +178,11 @@ export default function SearchPage() {
         <EmptyState
           icon={<MapPin className="h-12 w-12" />}
           title="No properties found"
-          description="Try a different city or adjust your filters"
+          description={
+            usingLocation
+              ? 'Nothing listed within that distance. Try a larger radius, or search by city.'
+              : 'Try a different city or adjust your filters'
+          }
         />
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
@@ -104,6 +191,7 @@ export default function SearchPage() {
             city: string; addressLine1: string; landmark?: string
             minRent: number | null; maxRent: number | null
             vacantBeds: number; amenities: string[]; coverPhoto: string | null
+            distanceKm: number | null
           }) => (
             <Link key={p.id} to={`/tenant/property/${p.id}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer p-0 overflow-hidden h-full">
@@ -125,6 +213,13 @@ export default function SearchPage() {
                   <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                     <MapPin className="h-3 w-3" />
                     <span>{p.addressLine1}, {p.city}</span>
+                    {p.distanceKm !== null && (
+                      <span className="ml-auto font-medium text-teal-700">
+                        {p.distanceKm < 1
+                          ? `${Math.round(p.distanceKm * 1000)} m away`
+                          : `${p.distanceKm} km away`}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 mb-3">

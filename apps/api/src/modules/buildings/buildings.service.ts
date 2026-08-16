@@ -405,6 +405,55 @@ export async function updateBuildingStatusService(
 // ─────────────────────────────────────────────────────────────
 // Public property search
 // ─────────────────────────────────────────────────────────────
+/** Mean Earth radius, km. */
+const EARTH_RADIUS_KM = 6371
+const KM_PER_DEGREE_LAT = 111.045
+
+/** Most candidates a single proximity search will rank. */
+const NEARBY_CANDIDATE_CAP = 500
+
+const toRad = (deg: number) => (deg * Math.PI) / 180
+
+/**
+ * Great-circle distance between two points, in kilometres.
+ *
+ * Haversine is accurate enough at city scale and needs no database extension —
+ * PostGIS would be the answer if this ever had to sort millions of rows.
+ */
+function haversineKm(
+  aLat: number, aLng: number,
+  bLat: number, bLng: number
+): number {
+  const dLat = toRad(bLat - aLat)
+  const dLng = toRad(bLng - aLng)
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2
+
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * A latitude/longitude box that fully contains the search circle.
+ *
+ * Used to narrow candidates in SQL before the exact distance is computed in
+ * memory: a box comparison is indexable, a trigonometric one is not. Longitude
+ * degrees shrink towards the poles, hence the cosine term.
+ */
+function boundingBox(lat: number, lng: number, radiusKm: number) {
+  const latDelta = radiusKm / KM_PER_DEGREE_LAT
+  // Guard the cosine so a near-polar search cannot divide by ~0.
+  const lngDelta = radiusKm / (KM_PER_DEGREE_LAT * Math.max(Math.cos(toRad(lat)), 0.01))
+
+  return {
+    minLat: lat - latDelta,
+    maxLat: lat + latDelta,
+    minLng: lng - lngDelta,
+    maxLng: lng + lngDelta,
+  }
+}
+
 export async function searchPropertiesService(query: Record<string, unknown>) {
   const {
     city,
@@ -412,6 +461,9 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
     genderPreference,
     minRent,
     maxRent,
+    lat: _lat,
+    lng: _lng,
+    radiusKm: _radiusKm,
     page: _page,
     limit: _limit,
   } = query as {
@@ -420,6 +472,9 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
     genderPreference?: string
     minRent?: string
     maxRent?: string
+    lat?: string
+    lng?: string
+    radiusKm?: string
     page?: string
     limit?: string
   }
@@ -427,6 +482,17 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
   const page = Math.max(1, parseInt(_page ?? '1', 10))
   const limit = Math.min(50, parseInt(_limit ?? '20', 10))
   const skip = (page - 1) * limit
+
+  // Proximity search is active only when both coordinates are present and sane.
+  const lat = _lat !== undefined ? Number(_lat) : NaN
+  const lng = _lng !== undefined ? Number(_lng) : NaN
+  const nearby =
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+
+  const radiusKm = nearby
+    ? Math.min(100, Math.max(0.5, Number(_radiusKm ?? 10) || 10))
+    : 0
 
   const where: Record<string, unknown> = {
     status: 'ACTIVE',
@@ -441,11 +507,25 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
     ...(genderPreference && { genderPreference }),
   }
 
+  if (nearby) {
+    const box = boundingBox(lat, lng, radiusKm)
+    // Indexed by @@index([latitude, longitude]). Buildings with no coordinates
+    // cannot be ranked by distance, so they drop out of a nearby search.
+    where.latitude  = { gte: box.minLat, lte: box.maxLat }
+    where.longitude = { gte: box.minLng, lte: box.maxLng }
+  }
+
+  // A nearby search has to rank the whole candidate set by distance before it
+  // can paginate, so the page window is applied afterwards. The cap keeps a
+  // large radius from pulling the entire table.
+  const pageArgs: { skip?: number; take: number } = nearby
+    ? { take: NEARBY_CANDIDATE_CAP }
+    : { skip, take: limit }
+
   const [buildings, total] = await Promise.all([
     prisma.building.findMany({
       where,
-      skip,
-      take: limit,
+      ...pageArgs,
       include: {
         amenities: {
           select: { name: true },
@@ -488,6 +568,12 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
         vacantBeds: b.beds.length,
         amenities: b.amenities.map((a) => a.name),
         coverPhoto: b.photos[0]?.fileUrl ?? null,
+        distanceKm:
+          nearby && b.latitude !== null && b.longitude !== null
+            ? Math.round(
+                haversineKm(lat, lng, Number(b.latitude), Number(b.longitude)) * 10
+              ) / 10
+            : null,
       }
     })
     .filter((item) => {
@@ -500,14 +586,28 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
       return true
     })
 
+  // The bounding box is a square around a circle, so trim the corners and rank
+  // by true distance before slicing the page out.
+  const ranked = nearby
+    ? items
+        .filter((i) => i.distanceKm !== null && i.distanceKm <= radiusKm)
+        .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+    : items
+
+  const paged = nearby ? ranked.slice(skip, skip + limit) : ranked
+  const matched = nearby ? ranked.length : items.length
+  const totalPages = Math.max(1, Math.ceil(matched / limit))
+
   return {
-    items,
+    items: paged,
+    searchedNearby: nearby,
+    radiusKm: nearby ? radiusKm : null,
     pagination: {
       page,
       limit,
-      total: items.length,
-      totalPages: Math.ceil(items.length / limit),
-      hasNext: page < Math.ceil(items.length / limit),
+      total: matched,
+      totalPages,
+      hasNext: page < totalPages,
       hasPrev: page > 1,
     },
   }
