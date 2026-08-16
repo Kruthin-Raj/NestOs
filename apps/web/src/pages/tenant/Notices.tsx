@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
@@ -33,13 +34,33 @@ export default function TenantNoticesPage() {
   const { mutate: markRead } = useMutation({
     mutationFn: (noticeId: string) =>
       apiClient.post(`/tenant/notices/${noticeId}/read`),
+    // Prefix key: refreshes both this list and the sidebar's ['notices','unread']
+    // badge. Invalidating only the list left a stale count in the sidebar.
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.notices.tenant() })
+      qc.invalidateQueries({ queryKey: ['notices'] })
+    },
+  })
+
+  const { mutate: markAllRead } = useMutation({
+    mutationFn: () => apiClient.post('/tenant/notices/read-all'),
+    // Only the badge is refreshed. Refetching the list too would strip the
+    // unread highlighting out from under the tenant while they are reading it.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notices', 'unread'] })
     },
   })
 
   const notices: Notice[] = data?.items ?? []
   const unreadCount = data?.unreadCount ?? 0
+
+  // Opening this page counts as reading them, so the badge clears on arrival.
+  // The ref keeps a refetch from firing this a second time.
+  const clearedRef = useRef(false)
+  useEffect(() => {
+    if (clearedRef.current || isLoading || unreadCount === 0) return
+    clearedRef.current = true
+    markAllRead()
+  }, [isLoading, unreadCount, markAllRead])
 
   return (
     <div>

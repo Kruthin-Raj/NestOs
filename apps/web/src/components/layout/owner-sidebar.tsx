@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Building2, Users, CreditCard,
+  LayoutDashboard, Building2, Users, CreditCard, CalendarCheck,
   AlertCircle, Bell, Settings, LogOut, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/owner/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/owner/buildings', icon: Building2,        label: 'Buildings' },
   { href: '/owner/tenants',   icon: Users,             label: 'Tenants' },
+  { href: '/owner/visits',    icon: CalendarCheck,     label: 'Visits' },
   { href: '/owner/payments',  icon: CreditCard,        label: 'Payments' },
   { href: '/owner/issues',    icon: AlertCircle,       label: 'Issues' },
   { href: '/owner/notices',   icon: Bell,              label: 'Notices' },

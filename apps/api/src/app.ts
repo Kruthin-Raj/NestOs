@@ -23,6 +23,7 @@ import { bookingsRouter } from '@modules/bookings/bookings.routes'
 import { paymentsRouter } from '@modules/payments/payments.routes'
 import { issuesRouter } from '@modules/issues/issues.routes'
 import { ownerNoticesRouter, tenantNoticesRouter } from '@modules/notices/notices.routes'
+import { ownerVisitsRouter, tenantVisitsRouter } from '@modules/visits/visits.routes'
 import { dashboardRouter } from '@modules/dashboard/dashboard.routes'
 import { adminRouter } from '@modules/admin/admin.routes'
 
@@ -103,6 +104,8 @@ export function createApp(): Application {
   app.use(`${API_PREFIX}/issues`,            issuesRouter)
   app.use(`${API_PREFIX}/owner/notices`,     ownerNoticesRouter)
   app.use(`${API_PREFIX}/tenant/notices`,    tenantNoticesRouter)
+  app.use(`${API_PREFIX}/owner/visits`,      ownerVisitsRouter)
+  app.use(`${API_PREFIX}/tenant/visits`,     tenantVisitsRouter)
   app.use(`${API_PREFIX}/owner/dashboard`,   dashboardRouter)
   app.use(`${API_PREFIX}/tenant/dashboard`,  dashboardRouter)
   app.use(`${API_PREFIX}/admin`,             adminRouter)

@@ -466,3 +466,77 @@ Plus, on both branches: API type check, API build, web lint (0 errors), web buil
 - **Do not reintroduce a static mount for `UPLOAD_DIR`.** That was F6.
 - Suggested next: a test harness covering auth rotation and upload authorization — the two
   places where a silent regression would be most expensive.
+
+---
+
+## 13. Branch 3 — tenant-facing features
+
+### The reported bug: clicking a tenant logged you out
+
+`Tenants.tsx:66` linked to `/owner/tenants/:tenantId`, but **no such route existed**. The
+catch-all `<Route path="*">` matched instead, and because it sits outside `OwnerLayout` the
+sidebar disappeared — which reads as "I got logged out" even though the session was fine.
+
+Added `apps/web/src/pages/owner/TenantDetail.tsx` and registered the route. The page shows
+identity, emergency contact, tenancy stats, recent payments and recent issues.
+
+**No notes card**, deliberately: `PATCH /owner/tenants/:id/notes` is a stub that returns
+`saved: false` because the schema has no field for it. Rendering an input that silently
+discards what an owner types is worse than not offering one.
+
+### Roommate compatibility
+
+`apps/api/src/modules/buildings/compatibility.ts`, wired into `getPublicPropertyService`.
+Gated on `room.capacity > 1 && activeTenants.length > 0` — confirming the instinct that
+this only makes sense for **shared** rooms. Returns `null` rather than a number when there
+is nothing to compare, so the UI can stay silent instead of inventing a 50%. Full rules in
+the README.
+
+### Visit scheduling
+
+New `visits` module (`visits.service.ts`, `visits.routes.ts`), a `VisitRequest` model, and
+two screens: a *Schedule a visit* card on the tenant's property page and a
+*Visit requests* list for the owner with confirm / decline / move-the-slot.
+
+Kept separate from `Booking` on purpose — a visit reserves no bed, so a browsing tenant
+cannot block inventory. `datetime-local` inputs are converted through local wall-clock time,
+not `toISOString()`, which would have silently shifted every slot by the timezone offset.
+
+**Requires `pnpm db:generate && pnpm db:push`** for the new table.
+
+### The unread notice badge did not clear
+
+Two separate causes:
+
+1. `markRead` invalidated `['notices','tenant',…]` while the sidebar badge queried
+   `['notices','unread']` — different keys, so the badge only updated on its 60-second
+   poll. Now invalidates the `['notices']` prefix, which covers both.
+2. Nothing marked notices read just because you *read* them. Added
+   `POST /tenant/notices/read-all`; opening the notices page calls it once.
+
+`markAllNoticesReadService` reuses the same audience filter as the list (extracted as
+`tenantNoticeScope`) so "mark everything read" can never touch a notice aimed at someone
+else. The badge refreshes; the list is deliberately **not** refetched, so the unread
+highlighting survives the visit you are currently making.
+
+### Verification
+
+`pnpm lint` (api `tsc --noEmit`), `pnpm build` and `pnpm lint` (web) all clean — the only
+web lint output is three pre-existing warnings.
+
+Behaviour was checked against a throwaway Docker Postgres with the API on **port 4100**
+(4000 belongs to the dev server) using real login cookies over HTTP — **25/25 probes pass**:
+
+- Authorization: anonymous 401; an owner cannot request a visit; a tenant cannot confirm
+  their own; one tenant cannot see or cancel another's.
+- Rules: past slots rejected, duplicate open requests rejected, no responding twice, no
+  cancelling twice, and a fresh request allowed after a cancellation.
+- Slot moving: `confirmedAt` differs from `requestedAt` and reaches the tenant with the
+  owner's note.
+- Notices: count 1 → `read-all` marks 1 → count 0, idempotent on a second call, and one
+  tenant reading does **not** clear another tenant's count.
+
+Docker container and image were removed afterwards.
+
+**Still not verified:** no automated tests, and no browser click-through — everything above
+is at the API contract level.

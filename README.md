@@ -372,6 +372,54 @@ before submitting is what gets created.
 
 ---
 
+## Roommate compatibility
+
+Lifestyle answers were collected at tenant onboarding and never used. They now produce a
+match score on the property page, per room:
+
+- **Shared rooms only, and only when someone already lives there.** A private room has
+  nobody to be compatible with, and an empty shared room has nothing to compare against —
+  the score is simply absent in both cases (`buildings/compatibility.ts`,
+  gated in `getPublicPropertyService`).
+- Five dimensions, weighted by how much friction they cause in practice: smoking (3),
+  cleanliness (3), sleep schedule (2), drinking (2), food (2).
+- Ordered scales score by distance, so `EARLY_BIRD` vs `FLEXIBLE` costs less than
+  `EARLY_BIRD` vs `NIGHT_OWL`. Food is not a scale — it only matters across the
+  veg / non-veg line, and `ANY` gets along with everyone.
+- Scores are averaged across occupants: one mismatched person in a four-bed room lowers
+  the score rather than vetoing it.
+- **When nothing can be compared the score is `null`, not `0` or `50`.** "We don't know"
+  and "you clash" are very different things to show someone deciding where to live.
+
+The UI shows the number, a bar, and the specific dimensions under *Differs on* /
+*Agrees on* — a bare percentage is not actionable.
+
+---
+
+## Visits
+
+A tenant can ask to see a place before committing to it. `VisitRequest` is deliberately
+**separate from `Booking`**: a visit reserves nothing and holds no bed, so browsing can
+never block inventory.
+
+```
+POST   /tenant/visits                  { buildingId, requestedAt, tenantNote? }
+GET    /tenant/visits
+POST   /tenant/visits/:visitId/cancel
+GET    /owner/visits
+POST   /owner/visits/:visitId/respond  { action: CONFIRM | DECLINE, confirmedAt?, ownerNote? }
+POST   /owner/visits/:visitId/cancel
+```
+
+- Confirming may **move the slot** — owners rarely have the exact time free — so
+  `confirmedAt` is stored separately from `requestedAt` and the tenant is shown that it
+  changed.
+- One open request per tenant per property, and at most 5 open at once.
+- Either side can cancel anything that has not happened yet.
+- The tenant's phone number is only shown to the owner **after** the visit is confirmed.
+
+---
+
 ## Accounts and passwords
 
 Sign in is **email + password**. A one-time code is only used to confirm an address at
@@ -567,8 +615,8 @@ create two rows. Key on `(bookingId, type, billingMonth, billingYear)`.
 
 | Feature | Notes |
 |---|---|
-| **Roommate compatibility** | Cheapest win here. Lifestyle preferences are already collected and never used — score a bed against the current occupants and show "85% match" on the property page. No external service. |
-| **Visit scheduling** | A `VisitRequest` model, a request button for the tenant, and an accept/decline list for the owner. No external service. |
+| ~~Roommate compatibility~~ | **Built** — see [Roommate compatibility](#roommate-compatibility). |
+| ~~Visit scheduling~~ | **Built** — see [Visits](#visits). |
 | **Digital rent agreement** | Generating and storing a PDF is easy. **A legally meaningful signature is not.** Typing a name proves very little; real e-sign in India means Aadhaar eSign through a licensed provider, or DocuSign, both paid. Ship it as an *unsigned agreement to download* and be honest that it is not e-signed. |
 
 ### Operations

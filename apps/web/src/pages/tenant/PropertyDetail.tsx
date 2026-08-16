@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { MapPin, Phone, Users } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { CalendarCheck, MapPin, Phone, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +21,9 @@ export default function PropertyDetailPage() {
     id: string; bedLabel: string; monthlyRent: number; roomNumber: string
   } | null>(null)
   const [moveInDate, setMoveInDate] = useState('')
+  const [visitAt, setVisitAt] = useState('')
+  const [visitNote, setVisitNote] = useState('')
+  const queryClient = useQueryClient()
 
   const { data: property, isLoading } = useQuery({
     queryKey: QUERY_KEYS.properties.detail(buildingId),
@@ -53,6 +56,22 @@ export default function PropertyDetailPage() {
     },
   })
 
+  const { mutate: requestVisit, isPending: requestingVisit } = useMutation({
+    mutationFn: (payload: { requestedAt: string; tenantNote?: string }) =>
+      apiClient.post('/tenant/visits', { buildingId, ...payload }),
+    onSuccess: () => {
+      setVisitAt('')
+      setVisitNote('')
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.visits.my() })
+      showToast('Visit requested. The owner will confirm a time.', 'success')
+      navigate('/tenant/visits')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Could not request a visit', 'error')
+    },
+  })
+
 
   if (isLoading) return <PageLoader />
   if (!property) return <EmptyState title="Property not found" />
@@ -61,6 +80,13 @@ export default function PropertyDetailPage() {
   const maxDate = new Date()
   maxDate.setDate(maxDate.getDate() + 60)
   const maxDateStr = maxDate.toISOString().split('T')[0]
+
+  // datetime-local expects local wall-clock time, so toISOString() (UTC) would
+  // be off by the timezone offset — an hour of valid slots would be rejected.
+  const toLocalInput = (d: Date) =>
+    new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  const minVisit = toLocalInput(new Date())
+  const maxVisit = toLocalInput(maxDate)
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -123,6 +149,54 @@ export default function PropertyDetailPage() {
         </Card>
       )}
 
+      {/* Visit request — a tenant asking to see the place. Reserves nothing,
+          so it stays independent of bed selection below. */}
+      <Card>
+        <CardTitle className="mb-1 flex items-center gap-2">
+          <CalendarCheck className="h-4 w-4 text-teal-600" />
+          Schedule a visit
+        </CardTitle>
+        <p className="text-xs text-gray-500 mb-3">
+          Pick a time that suits you. The owner confirms or suggests another slot —
+          nothing is booked and no money is due.
+        </p>
+        <div className="space-y-2">
+          <input
+            type="datetime-local"
+            min={minVisit}
+            max={maxVisit}
+            value={visitAt}
+            onChange={(e) => setVisitAt(e.target.value)}
+            className="w-full h-10 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+          />
+          <input
+            type="text"
+            maxLength={500}
+            value={visitNote}
+            onChange={(e) => setVisitNote(e.target.value)}
+            placeholder="Anything the owner should know? (optional)"
+            className="w-full h-10 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+          />
+          <Button
+            variant="secondary"
+            className="w-full"
+            loading={requestingVisit}
+            disabled={!visitAt}
+            onClick={() => {
+              if (!visitAt) return
+              requestVisit({
+                // datetime-local has no zone; Date() reads it as local, which
+                // is what the tenant meant.
+                requestedAt: new Date(visitAt).toISOString(),
+                tenantNote:  visitNote.trim() || undefined,
+              })
+            }}
+          >
+            Request visit
+          </Button>
+        </div>
+      </Card>
+
       {/* Room options */}
       <div>
         <h2 className="text-base font-semibold text-gray-900 mb-3">Available rooms</h2>
@@ -131,6 +205,12 @@ export default function PropertyDetailPage() {
           amenities: string[]; vacantBeds: number
           vacantBedDetails: Array<{ id: string; bedLabel: string; monthlyRent: number }>
           compatibilityInfo: Array<{ gender?: string; smoking?: string; foodPreference?: string; compatibilityBio?: string }>
+          compatibility: {
+            score: number | null
+            matches: Array<{ label: string; score: number }>
+            clashes: Array<{ label: string; score: number }>
+            comparedWith: number
+          } | null
         }) => (
           <Card key={room.id} className="mb-3">
             <div className="flex items-start justify-between mb-3">
@@ -155,6 +235,54 @@ export default function PropertyDetailPage() {
                     {a}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* How well this room's occupants match your own preferences.
+                Only present for shared rooms that already have someone in
+                them — see compatibility.ts. */}
+            {room.compatibility?.score !== null && room.compatibility && (
+              <div className="mb-3 rounded-lg border border-gray-200 p-2.5">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-gray-700">
+                    Roommate match
+                  </p>
+                  <span
+                    className={cn(
+                      'text-sm font-bold',
+                      room.compatibility.score >= 75 ? 'text-green-600'
+                        : room.compatibility.score >= 50 ? 'text-amber-600'
+                        : 'text-red-600'
+                    )}
+                  >
+                    {room.compatibility.score}%
+                  </span>
+                </div>
+                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full rounded-full',
+                      room.compatibility.score >= 75 ? 'bg-green-500'
+                        : room.compatibility.score >= 50 ? 'bg-amber-500'
+                        : 'bg-red-500'
+                    )}
+                    style={{ width: `${room.compatibility.score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Based on your lifestyle answers vs {room.compatibility.comparedWith}{' '}
+                  current housemate{room.compatibility.comparedWith === 1 ? '' : 's'}.
+                </p>
+                {room.compatibility.clashes.length > 0 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Differs on: {room.compatibility.clashes.map((c) => c.label).join(', ')}
+                  </p>
+                )}
+                {room.compatibility.matches.length > 0 && (
+                  <p className="text-xs text-green-700 mt-0.5">
+                    Agrees on: {room.compatibility.matches.map((m) => m.label).join(', ')}
+                  </p>
+                )}
               </div>
             )}
 

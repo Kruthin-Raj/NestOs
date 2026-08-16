@@ -11,6 +11,7 @@ import {
   deleteNoticeService,
   getTenantNoticesService,
   markNoticeReadService,
+  markAllNoticesReadService,
 } from './notices.service'
 
 const createNoticeSchema = z.object({
@@ -80,6 +81,15 @@ tenantNoticesRouter.get('/',
       req.query as Record<string, unknown>
     )
     sendSuccess(res, 'Notices fetched', result)
+  })
+)
+
+// POST /api/v1/tenant/notices/read-all
+// One segment, so it cannot collide with /:noticeId/read below.
+tenantNoticesRouter.post('/read-all',
+  asyncHandler(async (req, res) => {
+    const result = await markAllNoticesReadService(req.user!.userId)
+    sendSuccess(res, 'All notices marked as read', result)
   })
 )
 
