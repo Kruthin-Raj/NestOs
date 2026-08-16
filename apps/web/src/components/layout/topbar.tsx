@@ -1,11 +1,12 @@
 import { Menu } from 'lucide-react'
 import { useUIStore } from '@/store/ui.store'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 export function Topbar() {
   const { toggleSidebar } = useUIStore()
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 gap-3 lg:hidden">
+    <header className="h-16 bg-white dark:bg-gray-50 border-b border-gray-200 flex items-center px-4 gap-3 lg:hidden">
       <button
         onClick={toggleSidebar}
         className="p-2 rounded-lg text-gray-500 hover:bg-gray-100"
@@ -18,6 +19,7 @@ export function Topbar() {
         </div>
         <span className="font-semibold text-gray-900 text-sm">NestOS</span>
       </div>
+      <ThemeToggle className="ml-auto" />
     </header>
   )
 }

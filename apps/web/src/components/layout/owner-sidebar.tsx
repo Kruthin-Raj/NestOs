@@ -5,6 +5,7 @@ import {
   AlertCircle, Bell, Settings, LogOut, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useUIStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useLogout } from '@/features/auth/hooks/use-auth'
@@ -41,7 +42,7 @@ export function OwnerSidebar() {
       <aside
         className={cn(
           'fixed lg:static inset-y-0 left-0 z-30 flex flex-col',
-          'w-60 bg-white border-r border-gray-200 transition-transform duration-200',
+          'w-60 bg-white dark:bg-gray-50 border-r border-gray-200 transition-transform duration-200',
           'lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
@@ -112,13 +113,16 @@ export function OwnerSidebar() {
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>
           </div>
-          <button
-            onClick={() => doLogout()}
-            className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => doLogout()}
+              className="flex items-center gap-2 flex-1 px-2 py-1.5 text-sm text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
     </>

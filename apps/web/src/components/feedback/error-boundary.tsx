@@ -35,14 +35,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="max-w-md w-full rounded-xl border border-gray-200 bg-white p-6 text-center">
+        <div className="max-w-md w-full rounded-xl border border-gray-200 bg-white dark:bg-gray-50 p-6 text-center">
           <p className="text-lg font-semibold text-gray-900">Something broke on this page</p>
           <p className="mt-1 text-sm text-gray-500">
             The rest of the app is fine. Reload, or head back and try again.
           </p>
 
           {import.meta.env.DEV && (
-            <pre className="mt-4 max-h-48 overflow-auto rounded-lg bg-gray-900 p-3 text-left text-xs text-gray-100">
+            <pre className="mt-4 max-h-48 overflow-auto rounded-lg bg-gray-900 dark:bg-gray-100 p-3 text-left text-xs text-gray-100 dark:text-gray-900">
               {this.state.error.message}
             </pre>
           )}

@@ -62,7 +62,7 @@ export default function TenantNoticesPage() {
             <div
               key={n.id}
               className={cn(
-                'bg-white rounded-xl border p-4 cursor-pointer',
+                'bg-white dark:bg-gray-50 rounded-xl border p-4 cursor-pointer',
                 !n.isRead ? 'border-blue-200 shadow-sm' : 'border-gray-200'
               )}
               onClick={() => !n.isRead && markRead(n.id)}

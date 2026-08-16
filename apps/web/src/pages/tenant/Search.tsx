@@ -127,7 +127,7 @@ export default function SearchPage() {
                 setFilters(next)
                 setApplied(next)
               }}
-              className="h-8 rounded-lg border border-teal-300 bg-white px-2 text-sm"
+              className="h-8 rounded-lg border border-teal-300 bg-white dark:bg-gray-50 px-2 text-sm"
             >
               {RADIUS_OPTIONS.map((r) => (
                 <option key={r} value={r}>{r} km</option>
