@@ -72,7 +72,7 @@ export default function HomePage() {
               desc:  'Owner and tenant ID verification for a safe, trusted platform.',
             },
           ].map((f) => (
-            <div key={f.title} className="bg-white border border-gray-200 rounded-xl p-5">
+            <div key={f.title} className="bg-white dark:bg-gray-50 border border-gray-200 rounded-xl p-5">
               <div className="w-9 h-9 bg-gray-50 rounded-lg flex items-center justify-center mb-3">
                 {f.icon}
               </div>
@@ -93,7 +93,7 @@ export default function HomePage() {
             Join property owners who use NestOS to save time and collect rent reliably.
           </p>
           <Link to="/signup"
-            className="inline-flex items-center gap-2 bg-white text-indigo-600 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center gap-2 bg-white dark:bg-gray-50 text-indigo-600 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors"
           >
             Get started free
           </Link>

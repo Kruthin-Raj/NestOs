@@ -1,4 +1,5 @@
 import { prisma } from '@config/prisma'
+import { scoreCompatibility } from './compatibility'
 import { NotFoundError, BadRequestError } from '@utils/errors'
 import { buildPaginationMeta } from '@utils/response.util'
 import { parsePagination } from '@utils/pagination.util'
@@ -661,6 +662,15 @@ export async function getPublicPropertyService(
     throw new NotFoundError('Property not found')
   }
 
+  // A compatibility score needs the viewer's own lifestyle answers. Anonymous
+  // visitors get none, which is why this is optionalAuth rather than required.
+  const viewerPreferences = _viewerUserId
+    ? (await prisma.tenantProfile.findUnique({
+        where:   { userId: _viewerUserId },
+        select:  { preferences: true },
+      }))?.preferences ?? null
+    : null
+
   const roomOptions = await Promise.all(
     building.rooms.map(async (room) => {
       const activeTenants = await prisma.tenantProfile.findMany({
@@ -686,6 +696,17 @@ export async function getPublicPropertyService(
         compatibilityBio: t.preferences?.compatibilityBio,
       }))
 
+      // Only worth scoring where someone would actually be sharing: a private
+      // room has nobody to match against, and an empty shared room has nothing
+      // to compare.
+      const isShared = room.capacity > 1
+      const compatibility = isShared && activeTenants.length > 0
+        ? scoreCompatibility(
+            viewerPreferences,
+            activeTenants.map((t) => t.preferences)
+          )
+        : null
+
       return {
         id: room.id,
         type: room.type,
@@ -699,6 +720,7 @@ export async function getPublicPropertyService(
           monthlyRent: Number(bed.monthlyRent),
         })),
         compatibilityInfo,
+        compatibility,
       }
     })
   )

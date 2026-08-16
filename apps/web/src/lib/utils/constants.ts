@@ -78,4 +78,8 @@ export const QUERY_KEYS = {
     search: (f?: object) => ['properties', 'search', f] as const,
     detail: (id: string) => ['properties', 'detail', id] as const,
   },
+  visits: {
+    my:        () => ['visits', 'my'] as const,
+    ownerList: () => ['visits', 'owner'] as const,
+  },
 }

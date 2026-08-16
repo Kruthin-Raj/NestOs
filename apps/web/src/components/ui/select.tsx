@@ -12,7 +12,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     <select
       ref={ref}
       className={cn(
-        'w-full h-10 px-3 text-sm bg-white border rounded-lg outline-none transition-colors',
+        'w-full h-10 px-3 text-sm bg-white dark:bg-gray-50 border rounded-lg outline-none transition-colors',
         'focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500',
         error ? 'border-red-400' : 'border-gray-300',
         props.disabled && 'bg-gray-50 text-gray-500 cursor-not-allowed',

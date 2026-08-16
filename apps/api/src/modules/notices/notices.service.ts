@@ -141,13 +141,13 @@ export async function deleteNoticeService(noticeId: string, ownerId: string) {
   })
 }
 
-export async function getTenantNoticesService(
-  tenantUserId: string,
-  query: Record<string, unknown>
-) {
-  const { page, limit, skip } = parsePagination(query)
-  const { unreadOnly, category } = query as Record<string, string>
-
+/**
+ * Which notices this tenant is allowed to see, as a Prisma `where`.
+ *
+ * Shared by the list and the mark-all-read call so the two can never disagree —
+ * marking "everything" read must never touch a notice aimed at someone else.
+ */
+async function tenantNoticeScope(tenantUserId: string, category?: string) {
   const tenant = await prisma.tenantProfile.findUnique({
     where: { userId: tenantUserId },
     select: { id: true },
@@ -212,6 +212,18 @@ export async function getTenantNoticesService(
     ],
   }
 
+  return { tenantId: tenant.id, noticeWhere }
+}
+
+export async function getTenantNoticesService(
+  tenantUserId: string,
+  query: Record<string, unknown>
+) {
+  const { page, limit, skip } = parsePagination(query)
+  const { unreadOnly, category } = query as Record<string, string>
+
+  const { tenantId, noticeWhere } = await tenantNoticeScope(tenantUserId, category)
+
   const [notices, total] = await Promise.all([
     prisma.notice.findMany({
       where: noticeWhere,
@@ -220,7 +232,7 @@ export async function getTenantNoticesService(
       orderBy: { publishAt: 'desc' },
       include: {
         reads: {
-          where: { tenantId: tenant.id },
+          where: { tenantId },
           select: { readAt: true },
           take: 1,
         },
@@ -244,7 +256,7 @@ export async function getTenantNoticesService(
     where: {
       ...noticeWhere,
       reads: {
-        none: { tenantId: tenant.id },
+        none: { tenantId },
       },
     },
   })
@@ -275,4 +287,28 @@ export async function markNoticeReadService(noticeId: string, tenantUserId: stri
   })
 
   return { readAt: new Date() }
+}
+
+/**
+ * Clears the unread badge in one call — opening the notices list marks
+ * everything currently visible as read, which is what the badge is counting.
+ */
+export async function markAllNoticesReadService(tenantUserId: string) {
+  const { tenantId, noticeWhere } = await tenantNoticeScope(tenantUserId)
+
+  const unread = await prisma.notice.findMany({
+    where:  { ...noticeWhere, reads: { none: { tenantId } } },
+    select: { id: true },
+  })
+
+  if (unread.length === 0) return { markedRead: 0 }
+
+  // skipDuplicates guards the race where the tenant clicks a single notice at
+  // the same moment this runs.
+  const result = await prisma.noticeRead.createMany({
+    data: unread.map((n) => ({ noticeId: n.id, tenantId })),
+    skipDuplicates: true,
+  })
+
+  return { markedRead: result.count }
 }

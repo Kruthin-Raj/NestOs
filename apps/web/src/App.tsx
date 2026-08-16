@@ -25,6 +25,7 @@ import TenantPayments from '@/pages/tenant/Payments'
 import TenantIssues from '@/pages/tenant/Issues'
 import TenantIssueDetail from '@/pages/tenant/IssueDetail'
 import TenantNotices from '@/pages/tenant/Notices'
+import TenantVisits from '@/pages/tenant/Visits'
 import TenantSettings from '@/pages/tenant/Settings'
 import TenantOnboarding from '@/pages/tenant/Onboarding'
 
@@ -37,10 +38,12 @@ import OwnerBuildingEdit from '@/pages/owner/BuildingEdit'
 import OwnerRooms from '@/pages/owner/Rooms'
 import OwnerRoomDetail from '@/pages/owner/RoomDetail'
 import OwnerTenants from '@/pages/owner/Tenants'
+import OwnerTenantDetail from '@/pages/owner/TenantDetail'
 import OwnerIssues from '@/pages/owner/Issues'
 import OwnerIssueDetail from '@/pages/owner/IssueDetail'
 import OwnerPayments from '@/pages/owner/Payments'
 import OwnerNotices from '@/pages/owner/Notices'
+import OwnerVisits from '@/pages/owner/Visits'
 import OwnerSettings from '@/pages/owner/Settings'
 import OwnerOnboarding from '@/pages/owner/Onboarding'
 
@@ -76,6 +79,7 @@ export default function App() {
         <Route path="payments" element={<TenantPayments />} />
         <Route path="issues" element={<TenantIssues />} />
         <Route path="issues/:issueId" element={<TenantIssueDetail />} />
+        <Route path="visits" element={<TenantVisits />} />
         <Route path="notices" element={<TenantNotices />} />
         <Route path="settings" element={<TenantSettings />} />
       </Route>
@@ -92,9 +96,11 @@ export default function App() {
         <Route path="buildings/:buildingId/rooms" element={<OwnerRooms />} />
         <Route path="buildings/:buildingId/rooms/:roomId" element={<OwnerRoomDetail />} />
         <Route path="tenants" element={<OwnerTenants />} />
+        <Route path="tenants/:tenantId" element={<OwnerTenantDetail />} />
         <Route path="issues" element={<OwnerIssues />} />
         <Route path="issues/:issueId" element={<OwnerIssueDetail />} />
         <Route path="payments" element={<OwnerPayments />} />
+        <Route path="visits" element={<OwnerVisits />} />
         <Route path="notices" element={<OwnerNotices />} />
         <Route path="settings" element={<OwnerSettings />} />
       </Route>

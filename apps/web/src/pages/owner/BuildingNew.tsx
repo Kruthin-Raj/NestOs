@@ -202,7 +202,7 @@ export default function NewBuildingPage() {
                   'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
                   selectedAmenities.includes(a)
                     ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                    : 'bg-white dark:bg-gray-50 text-gray-600 border-gray-300 hover:border-indigo-400'
                 )}
               >
                 {a}

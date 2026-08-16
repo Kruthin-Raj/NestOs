@@ -11,7 +11,7 @@ export function PageLoader() {
 
 export function CardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+    <div className="bg-white dark:bg-gray-50 rounded-xl border border-gray-200 p-6 space-y-3">
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-2/3" />

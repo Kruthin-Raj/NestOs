@@ -66,6 +66,14 @@ enum BookingStatus {
   FAILED
 }
 
+enum VisitStatus {
+  REQUESTED
+  CONFIRMED
+  DECLINED
+  CANCELLED
+  COMPLETED
+}
+
 enum PaymentType {
   BOOKING_DEPOSIT
   SECURITY_DEPOSIT
@@ -271,6 +279,7 @@ model OwnerProfile {
   user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents           OwnerDocument[]
   buildings           Building[]
+  visitRequests       VisitRequest[]
   issues              Issue[]
   notices             Notice[]
   payments            Payment[]
@@ -333,6 +342,7 @@ model TenantProfile {
   preferences         TenantPreferences?
   documents           TenantDocument[]
   bookings            Booking[]
+  visitRequests       VisitRequest[]
   payments            Payment[]
   issues              Issue[]
   currentBed          Bed[]        @relation("CurrentTenant")
@@ -438,6 +448,7 @@ model Building {
   payments          Payment[]
   issues            Issue[]
   notices           Notice[]
+  visitRequests     VisitRequest[]
 
   @@index([ownerId])
   @@index([city])
@@ -770,4 +781,30 @@ model AuditLog {
   @@index([entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// A tenant asking to see a property before booking it. Deliberately separate
+// from Booking: most visits never become one, and a visit reserves nothing.
+model VisitRequest {
+  id            String      @id @default(uuid())
+  tenantId      String
+  buildingId    String
+  ownerId       String
+  status        VisitStatus @default(REQUESTED)
+  requestedAt   DateTime                        // the slot the tenant asked for
+  confirmedAt   DateTime?                       // the slot the owner agreed to
+  tenantNote    String?
+  ownerNote     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tenant        TenantProfile @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  building      Building      @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  owner         OwnerProfile  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([ownerId])
+  @@index([buildingId])
+  @@index([status])
+  @@map("visit_requests")
 }

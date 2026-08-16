@@ -1,8 +1,10 @@
 import { Link, Outlet } from 'react-router-dom'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 export default function AuthLayout() {
   return (
     <div className="min-h-screen flex bg-gray-50">
+      <ThemeToggle className="absolute top-4 right-4 z-10" />
       {/* Left side — form */}
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm lg:w-96">

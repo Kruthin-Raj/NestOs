@@ -1,9 +1,10 @@
 import { Link, Outlet } from 'react-router-dom'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 export default function MarketingLayout() {
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+    <div className="min-h-screen bg-white dark:bg-gray-50">
+      <header className="border-b border-gray-100 bg-white/80 dark:bg-gray-50/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-teal-600 flex items-center justify-center">
@@ -11,7 +12,8 @@ export default function MarketingLayout() {
             </div>
             <span className="font-bold text-xl text-gray-900 tracking-tight">NestOS</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
             <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900">
               Log in
             </Link>

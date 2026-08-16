@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Plus, ChevronRight, Layers } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ export default function RoomsPage() {
   const buildingId         = useRequiredParam('buildingId')
   const [showAddRoom, setShowAddRoom] = useState(false)
   const [showAddFloor, setShowAddFloor] = useState(false)
+  const [showBulkAdd, setShowBulkAdd] = useState(false)
 
  const { data: floors = [], isLoading } = useQuery<Floor[]>({
   queryKey: QUERY_KEYS.buildings.floors(buildingId),
@@ -54,8 +55,11 @@ const { data: rooms = [], isLoading: roomsLoading } = useQuery<Room[]>({
             <Button variant="outline" size="sm" onClick={() => setShowAddFloor(true)}>
               <Plus className="h-4 w-4 mr-1" /> Add floor
             </Button>
-            <Button size="sm" onClick={() => setShowAddRoom(true)}>
+            <Button variant="outline" size="sm" onClick={() => setShowAddRoom(true)}>
               <Plus className="h-4 w-4 mr-1" /> Add room
+            </Button>
+            <Button size="sm" onClick={() => setShowBulkAdd(true)}>
+              <Layers className="h-4 w-4 mr-1" /> Add many
             </Button>
           </div>
         }
@@ -65,6 +69,14 @@ const { data: rooms = [], isLoading: roomsLoading } = useQuery<Room[]>({
         <AddFloorForm
           buildingId={buildingId}
           onClose={() => setShowAddFloor(false)}
+        />
+      )}
+
+      {showBulkAdd && (
+        <BulkAddRoomsForm
+          buildingId={buildingId}
+          floors={floors}
+          onClose={() => setShowBulkAdd(false)}
         />
       )}
 
@@ -242,6 +254,169 @@ function AddRoomForm({
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
         </div>
       </form>
+    </Card>
+  )
+}
+
+/**
+ * Creates a numbered run of identical rooms, each with its beds.
+ *
+ * The preview uses the same rule as the API, so what an owner sees before
+ * submitting is exactly what gets created. Numbers already used in the building
+ * are skipped rather than failing the whole batch.
+ */
+function BulkAddRoomsForm({
+  buildingId, floors, onClose,
+}: { buildingId: string; floors: Floor[]; onClose: () => void }) {
+  const qc = useQueryClient()
+
+  const [floorId, setFloorId]         = useState('')
+  const [prefix, setPrefix]           = useState('')
+  const [startNumber, setStartNumber] = useState('101')
+  const [count, setCount]             = useState('10')
+  const [padTo, setPadTo]             = useState('0')
+  const [type, setType]               = useState<'PRIVATE' | 'SHARED' | 'DORMITORY'>('SHARED')
+  const [capacity, setCapacity]       = useState('2')
+  const [baseRent, setBaseRent]       = useState('')
+  const [bedLabelStyle, setBedLabelStyle] = useState<'ALPHA' | 'NUMERIC'>('ALPHA')
+
+  const startNum = parseInt(startNumber, 10)
+  const howMany  = parseInt(count, 10)
+  const pad      = parseInt(padTo, 10) || 0
+  const cap      = parseInt(capacity, 10) || 1
+
+  // Mirrors buildRoomNumber() in rooms.service.ts.
+  const preview = Number.isFinite(startNum) && Number.isFinite(howMany) && howMany > 0
+    ? Array.from({ length: Math.min(howMany, 200) }, (_, i) =>
+        `${prefix}${String(startNum + i).padStart(pad, '0')}`
+      )
+    : []
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () =>
+      apiClient.post(`/buildings/${buildingId}/rooms/bulk`, {
+        floorId,
+        startNumber: startNum,
+        count:       howMany,
+        type,
+        capacity:    cap,
+        baseRent:    Number(baseRent),
+        prefix:      prefix || undefined,
+        padTo:       pad || undefined,
+        bedLabelStyle,
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.rooms(buildingId) })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.floors(buildingId) })
+      const d = res.data.data
+      showToast(
+        d.skipped.length
+          ? `${d.createdRooms} rooms and ${d.createdBeds} beds created. ${d.skipped.length} already existed and were skipped.`
+          : `${d.createdRooms} rooms and ${d.createdBeds} beds created`,
+        'success'
+      )
+      onClose()
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Could not create the rooms', 'error')
+    },
+  })
+
+  const ready = Boolean(floorId) && preview.length > 0 && Number(baseRent) >= 500
+
+  return (
+    <Card>
+      <h3 className="text-sm font-semibold text-gray-900 mb-1">Add many rooms</h3>
+      <p className="text-xs text-gray-500 mb-4">
+        Generates a numbered run of identical rooms, each with {cap} bed{cap === 1 ? '' : 's'}.
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <FormField label="Floor" required className="col-span-2 sm:col-span-1">
+          <Select
+            value={floorId}
+            onChange={(e) => setFloorId(e.target.value)}
+            placeholder="Select floor"
+            options={floors.map((f) => ({
+              value: f.id,
+              label: f.label || `Floor ${f.floorNumber}`,
+            }))}
+          />
+        </FormField>
+        <FormField label="Prefix" hint="optional, e.g. A-">
+          <Input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="A-" />
+        </FormField>
+        <FormField label="Start at" required>
+          <Input value={startNumber} onChange={(e) => setStartNumber(e.target.value)} type="number" />
+        </FormField>
+        <FormField label="How many" required>
+          <Input value={count} onChange={(e) => setCount(e.target.value)} type="number" min={1} max={200} />
+        </FormField>
+        <FormField label="Pad to" hint="1 becomes 001">
+          <Input value={padTo} onChange={(e) => setPadTo(e.target.value)} type="number" min={0} max={6} />
+        </FormField>
+        <FormField label="Room type" required>
+          <Select
+            value={type}
+            onChange={(e) => setType(e.target.value as typeof type)}
+            options={[
+              { value: 'PRIVATE',    label: 'Private' },
+              { value: 'SHARED',     label: 'Shared' },
+              { value: 'DORMITORY',  label: 'Dormitory' },
+            ]}
+          />
+        </FormField>
+        <FormField label="Beds per room" required hint="private 1 · shared 2-4 · dorm 5-20">
+          <Input value={capacity} onChange={(e) => setCapacity(e.target.value)} type="number" min={1} max={20} />
+        </FormField>
+        <FormField label="Rent per bed (Rs)" required>
+          <Input value={baseRent} onChange={(e) => setBaseRent(e.target.value)} type="number" placeholder="6000" />
+        </FormField>
+        <FormField label="Bed labels">
+          <Select
+            value={bedLabelStyle}
+            onChange={(e) => setBedLabelStyle(e.target.value as typeof bedLabelStyle)}
+            options={[
+              { value: 'ALPHA',   label: 'A, B, C...' },
+              { value: 'NUMERIC', label: '1, 2, 3...' },
+            ]}
+          />
+        </FormField>
+      </div>
+
+      {preview.length > 0 && (
+        <div className="mt-4 rounded-lg bg-gray-50 border border-gray-200 p-3">
+          <p className="text-xs font-medium text-gray-500 mb-2">
+            Will create {preview.length} rooms and {preview.length * cap} beds
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {preview.slice(0, 24).map((n) => (
+              <span
+                key={n}
+                className="text-xs bg-white dark:bg-gray-50 border border-gray-200 text-gray-700 px-1.5 py-0.5 rounded"
+              >
+                {n}
+              </span>
+            ))}
+            {preview.length > 24 && (
+              <span className="text-xs text-gray-500 px-1.5 py-0.5">
+                +{preview.length - 24} more
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Numbers already used in this building are skipped.
+          </p>
+        </div>
+      )}
+
+      <div className="flex gap-2 mt-4">
+        <Button size="sm" loading={isPending} disabled={!ready} onClick={() => mutate()}>
+          Create {preview.length || ''} rooms
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+      </div>
     </Card>
   )
 }

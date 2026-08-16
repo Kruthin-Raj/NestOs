@@ -1,11 +1,49 @@
 @import "tailwindcss";
 
+/* Opt into class-based dark mode. Tailwind v4 defaults `dark:` to the OS
+   preference; this makes it follow a `.dark` class on <html> so the app has an
+   explicit toggle. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --radius: 0.5rem;
 }
 
+/*
+  Dark mode by palette inversion.
+
+  Tailwind v4 compiles every gray utility to `var(--color-gray-N)`, so
+  redefining those variables under `.dark` re-skins the whole app at once —
+  `text-gray-900` becomes near-white, `border-gray-200` becomes a dark border,
+  and so on. The alternative was adding a `dark:` variant to ~370 class names
+  across 57 files.
+
+  Two rules follow from this:
+    - Do NOT override --color-white. `text-white` sits on coloured buttons and
+      must stay white; surfaces use `bg-white dark:bg-gray-50` instead.
+    - Treat gray-50/100 as "surface" and gray-800/900 as "text". A component
+      that uses bg-gray-900 as a dark surface will inverit to near-white, so it
+      needs an explicit dark: override (see AdminLayout, ErrorBoundary).
+*/
+.dark {
+  --color-gray-50:  #0f1523;  /* page and card surfaces */
+  --color-gray-100: #171e2e;  /* raised surface, hover */
+  --color-gray-200: #232c3d;  /* borders */
+  --color-gray-300: #2f3a4d;  /* stronger borders, inputs */
+  --color-gray-400: #7c8798;  /* faint text */
+  --color-gray-500: #98a3b3;  /* secondary text */
+  --color-gray-600: #b4bdca;
+  --color-gray-700: #cbd2dc;
+  --color-gray-800: #e2e6ec;
+  --color-gray-900: #f1f3f6;  /* primary text */
+}
+
 * {
   border-color: #e5e7eb;
+}
+
+.dark * {
+  border-color: #232c3d;
 }
 
 body {
@@ -13,6 +51,16 @@ body {
   color: #111827;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-color: #0b0f19;
+  color: #f1f3f6;
+}
+
+/* Native controls (date pickers, select arrows, scrollbars) follow this. */
+.dark {
+  color-scheme: dark;
 }
 
 .scrollbar-hide {

@@ -3,6 +3,7 @@ import { ShieldCheck, LogOut } from 'lucide-react'
 import { useMe, useLogout } from '@/features/auth/hooks/use-auth'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { cn } from '@/lib/utils/cn'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 const NAV_ITEMS = [
   { href: '/admin/owners',  label: 'Owner verification' },
@@ -33,14 +34,15 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-gray-900 text-white">
+      <header className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-indigo-400" />
             <span className="font-semibold">NestOS Admin</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-300 hidden sm:inline">{user.email}</span>
+            <span className="text-sm text-gray-300 dark:text-gray-600 hidden sm:inline">{user.email}</span>
+            <ThemeToggle className="text-gray-300 hover:bg-white/10 hover:text-white dark:text-gray-600" />
             <button
               onClick={() => doLogout()}
               className="flex items-center gap-1.5 text-sm text-gray-300 hover:text-white"
