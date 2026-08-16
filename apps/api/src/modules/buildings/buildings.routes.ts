@@ -38,6 +38,11 @@ publicBuildingsRouter.get('/search',
       city: z.string().optional(), page: z.string().optional(),
       limit: z.string().optional(), type: z.string().optional(),
       genderPreference: z.string().optional(),
+      minRent: z.string().optional(), maxRent: z.string().optional(),
+      // Supplying both switches on proximity search: results are limited to
+      // radiusKm of the point and ordered nearest first.
+      lat: z.string().optional(), lng: z.string().optional(),
+      radiusKm: z.string().optional(),
     })
   ),
   asyncHandler(async (req, res) => {

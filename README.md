@@ -11,6 +11,9 @@ property owners and tenants.
 > [Accounts and passwords](#accounts-and-passwords) and
 > [Getting an owner verified](#getting-an-owner-verified) — the owner dashboard is gated
 > behind approval, and that trips everyone up once.
+>
+> **Putting it online?** Read [Before you deploy](#before-you-deploy) first — HTTPS and
+> cookie settings decide whether login works at all.
 
 ## Tech Stack
 
@@ -183,6 +186,32 @@ tenant's UPI reference.
 Booking has three gates in order: the tenant's ID must be verified, their profile at least
 70% complete, and the bed vacant. A tenant with an active booking must cancel it before
 making another.
+
+---
+
+## Nearby search
+
+`GET /buildings/search` takes `lat`, `lng` and `radiusKm`. Supplying both coordinates
+switches it into proximity mode: results are limited to the radius, ordered nearest first,
+and each item carries a `distanceKm`. Without them it behaves exactly as before.
+
+```
+GET /buildings/search?lat=17.4485&lng=78.3908&radiusKm=5
+```
+
+A bounding box narrows candidates in SQL first — `@@index([latitude, longitude])` covers
+it — then exact Haversine distance is computed in memory, the corners of the box are
+trimmed to a true circle, and the page is taken from the ranked list. No PostGIS and no
+raw SQL. `radiusKm` is clamped to 0.5–100, and coordinates that are missing or nonsense
+fall back to an ordinary search rather than failing.
+
+On the tenant search page this is the **Near me** button, which uses the browser's
+geolocation (see [Before you deploy](#before-you-deploy) — it needs HTTPS outside
+localhost).
+
+**Only buildings with coordinates can appear.** They are set with the map picker on the
+building form, so any property created before that existed has `NULL` and will not show up
+in a nearby search — it is still found by city.
 
 ---
 
@@ -385,6 +414,78 @@ Then sign in at `/login` and open `/admin`.
 To skip the whole gate while developing, open `pnpm db:studio` and set
 `owner_profiles.verificationStatus` to `VERIFIED` directly.
 
+## Before you deploy
+
+Everything below works on localhost and behaves differently once it is not. None of it
+needs changing to develop; all of it matters the day you put this on the internet.
+
+### 1. Serve both apps over HTTPS
+
+`src/utils/jwt.util.ts` sets the auth cookies with `secure: env.isProduction`. Over plain
+`http://` the browser accepts the cookie and then refuses to send it back, so login
+returns `200` and every request after it is unauthenticated. It looks like a bug in the
+code; it is the browser doing exactly what it was told.
+
+`navigator.geolocation` — "Near me" on tenant search, and "Use my location" in the
+building location picker — is also only available in a secure context. **localhost is
+exempt**, which is why both work in development. On plain HTTP in production they fail.
+The maps themselves still render; only locating the user is blocked.
+
+### 2. Put both apps on the same site, or loosen SameSite
+
+Production cookies use `sameSite: 'strict'`. "Site" means the registrable domain — the
+port is not part of it, which is why `localhost:3000` talking to `localhost:4000` is fine.
+
+| Deployment | Works? |
+|---|---|
+| `app.example.com` + `api.example.com` | yes — same site |
+| `example.com` serving both | yes |
+| `something.vercel.app` + `something.onrender.com` | **no — different sites** |
+
+The last row is a common free-tier split and it fails confusingly: login succeeds, then
+everything 401s, because the cookie is never sent. If you must split hosts, the cookies
+need `sameSite: 'none'`, which in turn requires `secure: true` and therefore HTTPS on
+both.
+
+Whatever you choose, `FRONTEND_URL` on the API must exactly match the web origin or CORS
+rejects everything.
+
+### 3. Move uploads off local disk
+
+`UPLOAD_DIR` is a directory on the server. Render, Railway, Heroku and similar hosts give
+you an **ephemeral filesystem**: it is wiped on every deploy and restart. Uploaded Aadhaar
+and PAN documents disappear while their database rows still point at them, and separate
+instances cannot see each other's files.
+
+The fix is object storage (S3, Supabase Storage, Cloudflare R2). The upload flow is
+already shaped for it — `presigned-url` then `PUT` then `confirm` — so only the storage
+adapter and the authorized read route need to change.
+
+### 4. Replace the map tiles for real traffic
+
+OpenStreetMap tiles are free and need no API key, but their usage policy targets
+development and light use; heavy traffic gets throttled or blocked. For production use a
+tile provider (MapTiler, Stadia, Carto — these do need keys) or self-host. Only the
+`L.tileLayer(...)` URL in `location-picker.tsx` and `Map.tsx` changes.
+
+### 5. Know the free-tier limits
+
+A free Supabase project **pauses after about 7 days of inactivity** — a sudden "Can't
+reach database" usually means resuming it from the dashboard rather than a code problem.
+It also has connection limits; one long-running API process is fine, many instances would
+want the connection pooler.
+
+### 6. Accept what is deliberately manual
+
+Payment confirmation is a human step: a UPI intent payment leaves no server-side trail, so
+nothing stops an owner confirming money that never arrived. That is inherent to zero-fee
+UPI — the alternative is a payment gateway with webhooks. See
+[How payments work](#how-payments-work).
+
+There are also no tests and no CI, so every regression is found by a human in a browser.
+
+---
+
 ## Known issues
 
 Actively under development. Check here before assuming something you wrote is broken.
@@ -397,8 +498,9 @@ Actively under development. Check here before assuming something you wrote is br
 | 10 | No tests and no CI. `pnpm lint` and `pnpm build` are the only automated checks. |
 | 11 | `dashboardRouter` is mounted at both `/owner/dashboard` and `/tenant/dashboard` while defining `/owner` and `/tenant` paths, so the real URLs double up (`/owner/dashboard/owner`). It works and the frontend matches, but it reads oddly — this is the same shape that made notices 404 before it was fixed. |
 | 12 | The admin UI covers owner verification and tenant identity only. There is no user management, and a rejected owner or tenant can only resubmit by re-uploading documents. |
-| 13 | Payment confirmation is a manual trust step. A UPI intent payment leaves no server-side trail, so nothing stops an owner confirming money that never arrived. Inherent to zero-fee UPI; a gateway with webhooks is the alternative. |
-| 14 | Uploaded documents are stored on local disk, so they do not survive a redeploy on a host with an ephemeral filesystem. |
+| 13 | Payment confirmation is a manual trust step — see [Before you deploy](#before-you-deploy). |
+| 14 | Uploads live on local disk and do not survive a redeploy on an ephemeral filesystem — see [Before you deploy](#before-you-deploy). |
+| 15 | A building with no coordinates cannot appear in a nearby search. Older buildings predate the map picker. |
 
 ### Fixed
 
