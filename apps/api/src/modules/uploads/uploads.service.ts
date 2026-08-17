@@ -307,9 +307,17 @@ export async function getDocumentFileService(
   const exists = await fsp.stat(absolutePath).then((s) => s.isFile()).catch(() => false)
   if (!exists) throw new NotFoundError('Document file is missing from storage')
 
+  // Rows written before the confirm route constrained mimeType may hold any
+  // string, and this value becomes the response Content-Type. Anything not on
+  // the allowlist is served as an opaque download rather than trusted.
+  const storedMime = doc.mimeType ?? ''
+  const mimeType = UPLOAD.ALLOWED_MIME_TYPES.includes(storedMime as never)
+    ? storedMime
+    : 'application/octet-stream'
+
   return {
     absolutePath,
-    mimeType: doc.mimeType ?? 'application/octet-stream',
+    mimeType,
     fileName: doc.fileName ?? path.basename(absolutePath),
   }
 }
