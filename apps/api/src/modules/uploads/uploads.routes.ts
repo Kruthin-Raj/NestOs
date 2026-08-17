@@ -104,9 +104,8 @@ uploadsRouter.get('/documents/:documentId',
     )
 
     res.setHeader('Content-Type', file.mimeType)
-    // attachment, and no-store: these are identity documents — keep them out of
-    // shared caches and out of the browser's inline renderer.
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`)
+    // inline: allows the admin to view documents in the in-app modal / browser renderer without downloading to disk.
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.fileName)}"`)
     res.setHeader('Cache-Control', 'no-store, private')
 
     fs.createReadStream(file.absolutePath).pipe(res)
