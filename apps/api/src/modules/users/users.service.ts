@@ -67,6 +67,7 @@ export async function getFullProfileService(userId: string, role: UserRole) {
           select: {
             documentType: true,
             status: true,
+            reviewNotes: true,
             createdAt: true,
           },
         },
@@ -94,10 +95,12 @@ export async function getFullProfileService(userId: string, role: UserRole) {
       where: { userId },
       include: {
         preferences: true,
-        // Needed to tell "not uploaded" from "uploaded, awaiting review" on the
-        // settings page. Same shape as the owner branch — no file keys.
+        // Needed to tell "not uploaded" from "uploaded, awaiting review" from
+        // "rejected" on the settings page. reviewNotes carries the admin's
+        // reason — without it a rejected tenant is told no as a bare fact and
+        // has nothing to act on. Same shape as the owner branch — no file keys.
         documents: {
-          select: { documentType: true, status: true, createdAt: true },
+          select: { documentType: true, status: true, reviewNotes: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
         },
       },

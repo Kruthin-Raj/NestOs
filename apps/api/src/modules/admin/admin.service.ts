@@ -83,7 +83,11 @@ export async function getPendingTenantsService() {
   const tenants = await prisma.tenantProfile.findMany({
     where: {
       isIdVerified: false,
-      documents:    { some: {} },
+      // At least one document still awaiting a decision. Matching on "has any
+      // document at all" kept rejected tenants in this list forever, so a
+      // rejection looked like it had not registered. Uploading a replacement
+      // creates an UPLOADED row, which brings the tenant back automatically.
+      documents:    { some: { status: { not: 'REJECTED' } } },
     },
     include: {
       user:      { select: { email: true, createdAt: true } },

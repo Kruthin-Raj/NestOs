@@ -49,8 +49,19 @@ export default function TenantSettingsPage() {
   // reading it here always evaluated truthy, so the page claimed the identity
   // was verified and hid the upload control while isIdVerified was false.
   const idVerified = Boolean(full?.tenantProfile?.isIdVerified)
-  const idDocuments = (full?.tenantProfile?.documents ?? []) as Array<{ status: string }>
-  const idUnderReview = !idVerified && idDocuments.length > 0
+  const idDocuments = (full?.tenantProfile?.documents ?? []) as Array<{
+    status: string; reviewNotes?: string | null
+  }>
+
+  // Documents come back newest-first, so the latest one is what the tenant is
+  // waiting on. Counting documents instead of reading their status is what left
+  // a rejected tenant staring at "waiting for review" forever — a resubmission
+  // has to be able to move the state back out of REJECTED, and an old rejected
+  // document must not hold the whole card hostage.
+  const latestDocument = idDocuments[0]
+  const idRejected    = !idVerified && latestDocument?.status === 'REJECTED'
+  const idUnderReview = !idVerified && !idRejected && idDocuments.length > 0
+  const rejectionReason = idRejected ? latestDocument?.reviewNotes : null
 
   // `values`, not `defaultValues`: the profile request has not resolved on the
   // first render, and defaultValues is only read once — which is why saved
@@ -97,15 +108,33 @@ export default function TenantSettingsPage() {
       <Card>
         <CardTitle className="mb-3">Identity verification</CardTitle>
         <div className="flex items-center gap-3">
-          <StatusBadge status={idVerified ? 'VERIFIED' : idUnderReview ? 'UNDER_REVIEW' : 'PENDING'} />
+          <StatusBadge
+            status={
+              idVerified    ? 'VERIFIED'
+              : idRejected  ? 'REJECTED'
+              : idUnderReview ? 'UNDER_REVIEW'
+              : 'PENDING'
+            }
+          />
           <p className="text-sm text-gray-600">
             {idVerified
               ? 'Your identity is verified'
+              : idRejected
+              ? 'Your document was not accepted. Upload a clearer copy to try again.'
               : idUnderReview
               ? 'Your document is uploaded and waiting for review'
               : 'Upload your Aadhaar to verify your identity — booking is locked until then'}
           </p>
         </div>
+
+        {/* The admin's reason. Telling someone "rejected" without saying why
+            leaves them guessing at what to change. */}
+        {rejectionReason && (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
+            <span className="font-medium">Reason: </span>{rejectionReason}
+          </p>
+        )}
+
         {!idVerified && (
           <div className="mt-3">
             <AadhaarUpload />
