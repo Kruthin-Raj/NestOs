@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { Router } from 'express'
 import { z } from 'zod'
+import { UPLOAD } from '@config/constants'
 import { authenticate } from '@middleware/auth.middleware'
 import { validate } from '@middleware/validate.middleware'
 import { asyncHandler } from '@utils/async-handler'
@@ -30,7 +31,11 @@ const confirmSchema = z.object({
   documentType:  documentTypeEnum,
   fileName:      z.string().max(255).optional(),
   fileSizeBytes: z.number().int().positive().optional(),
-  mimeType:      z.string().max(100).optional(),
+  // Constrained to the same allowlist as /presigned-url. This value is stored
+  // and later echoed back as the Content-Type of the download, so accepting an
+  // arbitrary string here would let a caller choose how their own file is
+  // rendered in a reviewing admin's browser.
+  mimeType:      z.enum(UPLOAD.ALLOWED_MIME_TYPES).optional(),
 })
 
 export const uploadsRouter: ReturnType<typeof Router> = Router()
@@ -106,6 +111,11 @@ uploadsRouter.get('/documents/:documentId',
     res.setHeader('Content-Type', file.mimeType)
     // attachment, and no-store: these are identity documents — keep them out of
     // shared caches and out of the browser's inline renderer.
+    //
+    // The admin viewer does NOT need `inline`. It fetches with
+    // responseType: 'blob' and renders a blob: URL, and XHR ignores
+    // Content-Disposition entirely — this header only applies when the browser
+    // navigates to the URL directly.
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`)
     res.setHeader('Cache-Control', 'no-store, private')
 

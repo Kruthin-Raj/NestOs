@@ -53,7 +53,8 @@ async function issueOtp(email: string): Promise<void> {
 
     // Still surfaced locally so development is not blocked by SMTP.
     if (env.isDevelopment) {
-      console.log(`🔥 EMAIL FAILED — OTP for ${email}: ${code}`)
+      console.log(`🔥 EMAIL FAILED — DEV OTP for ${email}: ${code}`)
+      return
     }
 
     throw new BadRequestError(
