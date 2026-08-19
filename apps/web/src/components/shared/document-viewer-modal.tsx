@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   X,
   ZoomIn,
@@ -39,16 +39,31 @@ export function DocumentViewerModal({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
 
-  // Reset state when a new document is opened
-  useEffect(() => {
-    if (isOpen) {
-      setScale(1)
-      setRotation(0)
-      setImageLoading(true)
-    }
-  }, [isOpen, blobUrl])
+  // Declared before the effect that calls them — hoisting only works for
+  // function declarations, and these are consts. No useCallback: the React
+  // Compiler memoizes them, and hand-written useCallback here defeated it.
+  function handleZoomIn() {
+    setScale((prev) => Math.min(prev + 0.25, 3.5))
+  }
 
-  // Handle ESC key to close
+  function handleZoomOut() {
+    setScale((prev) => Math.max(prev - 0.25, 0.5))
+  }
+
+  function handleResetZoom() {
+    setScale(1)
+    setRotation(0)
+  }
+
+  function handleRotate() {
+    setRotation((prev) => (prev + 90) % 360)
+  }
+
+  // Esc closes; +/- zoom; r rotates.
+  //
+  // The state reset that used to live here is gone: document-row now mounts
+  // this component only while it is open, so every open starts from the
+  // useState defaults without an effect writing state during render.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!isOpen) return
@@ -64,24 +79,7 @@ export function DocumentViewerModal({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
-
-  const handleZoomIn = useCallback(() => {
-    setScale((prev) => Math.min(prev + 0.25, 3.5))
-  }, [])
-
-  const handleZoomOut = useCallback(() => {
-    setScale((prev) => Math.max(prev - 0.25, 0.5))
-  }, [])
-
-  const handleResetZoom = useCallback(() => {
-    setScale(1)
-    setRotation(0)
-  }, [])
-
-  const handleRotate = useCallback(() => {
-    setRotation((prev) => (prev + 90) % 360)
-  }, [])
+  }, [isOpen, onClose, handleZoomIn, handleZoomOut, handleRotate])
 
   if (!isOpen || !blobUrl) return null
 
