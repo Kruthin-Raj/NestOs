@@ -27,6 +27,27 @@ const createNoticeSchema = z.object({
   expiresAt:        z.string().optional(),
   sendEmail:        z.boolean().optional(),
 })
+  // Every target type except ALL_BUILDINGS needs the id of the thing it points
+  // at. Without this the API accepted targetType: 'BUILDING' with no building,
+  // stored a notice that matches no tenant's scope, and reported success — the
+  // owner saw "Notice published" for something nobody would ever receive.
+  .superRefine((dto, ctx) => {
+    const required = {
+      BUILDING: 'targetBuildingId',
+      FLOOR:    'targetFloorId',
+      ROOM:     'targetRoomId',
+      TENANT:   'targetTenantId',
+    } as const
+
+    const field = required[dto.targetType as keyof typeof required]
+    if (field && !dto[field]) {
+      ctx.addIssue({
+        code:    z.ZodIssueCode.custom,
+        path:    [field],
+        message: `Choose which ${dto.targetType.toLowerCase()} this notice is for`,
+      })
+    }
+  })
 
 type NoticeParams = { noticeId: string }
 

@@ -27,6 +27,17 @@ export async function createNoticeService(
     if (!b) throw new NotFoundError('Target building not found')
   }
 
+  // Same check for a personally addressed notice. Only the building target was
+  // verified, so an owner could address a notice to someone else's tenant and
+  // that tenant would receive it — a TENANT notice matches on tenant id alone.
+  if (dto.targetTenantId) {
+    const isMyTenant = await prisma.booking.findFirst({
+      where:  { tenantId: dto.targetTenantId, ownerId, status: 'CONFIRMED' },
+      select: { id: true },
+    })
+    if (!isMyTenant) throw new NotFoundError('Target tenant not found')
+  }
+
   let recipientCount = 0
 
   if (dto.targetType === 'ALL_BUILDINGS') {
@@ -155,47 +166,59 @@ async function tenantNoticeScope(tenantUserId: string, category?: string) {
 
   if (!tenant) throw new NotFoundError('Tenant profile not found')
 
-  const booking = await prisma.booking.findFirst({
-    where: { tenantId: tenant.id, status: 'CONFIRMED' },
-    select: {
-      buildingId: true,
-      roomId: true,
-    },
+  // findMany, not findFirst: a tenant with two confirmed bookings used to get
+  // notices for whichever one the database happened to return.
+  const bookings = await prisma.booking.findMany({
+    where:  { tenantId: tenant.id, status: 'CONFIRMED' },
+    select: { buildingId: true, roomId: true, ownerId: true },
   })
 
-  let floorId: string | null = null
+  const ownerIds    = [...new Set(bookings.map((b) => b.ownerId))]
+  const buildingIds = [...new Set(bookings.map((b) => b.buildingId))]
+  const roomIds     = [...new Set(bookings.map((b) => b.roomId))]
 
-  if (booking?.roomId) {
-    const room = await prisma.room.findUnique({
-      where: { id: booking.roomId },
-      select: { floorId: true },
-    })
-    floorId = room?.floorId ?? null
-  }
+  const floorIds = roomIds.length
+    ? (await prisma.room.findMany({
+        where:  { id: { in: roomIds } },
+        select: { floorId: true },
+      })).map((r) => r.floorId)
+    : []
 
   const now = new Date()
 
   const targetConditions: Array<Record<string, unknown>> = [
-    { targetType: 'ALL_BUILDINGS' },
     { targetType: 'TENANT', targetTenantId: tenant.id },
   ]
 
-  if (booking) {
+  // ALL_BUILDINGS means "every building *this owner* runs", not every building
+  // on the platform. Without the ownerId filter the condition matched on
+  // targetType alone, so one landlord's announcements reached every tenant in
+  // the database — including tenants with no booking at all.
+  if (ownerIds.length) {
     targetConditions.push({
-      targetType: 'BUILDING',
-      targetBuildingId: booking.buildingId,
+      targetType: 'ALL_BUILDINGS',
+      ownerId:    { in: ownerIds },
     })
+  }
 
-    if (floorId) {
-      targetConditions.push({
-        targetType: 'FLOOR',
-        targetFloorId: floorId,
-      })
-    }
-
+  if (buildingIds.length) {
     targetConditions.push({
-      targetType: 'ROOM',
-      targetRoomId: booking.roomId,
+      targetType:       'BUILDING',
+      targetBuildingId: { in: buildingIds },
+    })
+  }
+
+  if (floorIds.length) {
+    targetConditions.push({
+      targetType:    'FLOOR',
+      targetFloorId: { in: floorIds },
+    })
+  }
+
+  if (roomIds.length) {
+    targetConditions.push({
+      targetType:   'ROOM',
+      targetRoomId: { in: roomIds },
     })
   }
 
