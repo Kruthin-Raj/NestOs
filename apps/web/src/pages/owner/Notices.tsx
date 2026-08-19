@@ -21,11 +21,25 @@ import { showToast } from '@/components/ui/toaster'
 import type { Notice } from '@/types'
 
 const noticeSchema = z.object({
-  title:      z.string().min(5).max(255),
-  body:       z.string().min(10).max(5000),
-  category:   z.string(),
-  targetType: z.enum(['ALL_BUILDINGS', 'BUILDING', 'FLOOR', 'ROOM', 'TENANT']),
+  title:            z.string().min(5).max(255),
+  body:             z.string().min(10).max(5000),
+  category:         z.string(),
+  targetType:       z.enum(['ALL_BUILDINGS', 'BUILDING', 'FLOOR', 'ROOM', 'TENANT']),
+  targetBuildingId: z.string().optional(),
+  targetTenantId:   z.string().optional(),
 })
+  // Mirrors the API's own check, so the owner is told before publishing rather
+  // than after. A notice with no target reaches nobody.
+  .superRefine((v, ctx) => {
+    if (v.targetType === 'BUILDING' && !v.targetBuildingId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['targetBuildingId'],
+        message: 'Choose a building' })
+    }
+    if (v.targetType === 'TENANT' && !v.targetTenantId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['targetTenantId'],
+        message: 'Choose a tenant' })
+    }
+  })
 
 export default function OwnerNoticesPage() {
   const [showForm, setShowForm] = useState(false)
@@ -61,9 +75,42 @@ export default function OwnerNoticesPage() {
     },
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, watch, formState: { errors }, reset } = useForm({
     resolver: zodResolver(noticeSchema),
   })
+
+  const targetType = watch('targetType')
+
+  // Only fetched once the owner picks that audience — most notices go to
+  // everyone, so there is no reason to load either list up front.
+  const { data: buildingData } = useQuery({
+    queryKey: QUERY_KEYS.buildings.list(),
+    queryFn:  async () => {
+      const { data } = await apiClient.get('/buildings')
+      return data.data
+    },
+    enabled: targetType === 'BUILDING',
+  })
+
+  const { data: tenantData } = useQuery({
+    queryKey: QUERY_KEYS.tenants.list(),
+    queryFn:  async () => {
+      const { data } = await apiClient.get('/owner/tenants')
+      return data.data
+    },
+    enabled: targetType === 'TENANT',
+  })
+
+  const buildingOptions = (buildingData?.items ?? []).map(
+    (b: { id: string; name: string }) => ({ value: b.id, label: b.name })
+  )
+
+  const tenantOptions = (tenantData?.items ?? []).map(
+    (t: { id: string; fullName: string; room?: { roomNumber: string } }) => ({
+      value: t.id,
+      label: t.room ? `${t.fullName} — Room ${t.room.roomNumber}` : t.fullName,
+    })
+  )
 
   const notices: Notice[] = data?.items ?? []
 
@@ -85,7 +132,21 @@ export default function OwnerNoticesPage() {
       {showForm && (
         <Card>
           <CardTitle className="mb-4">Create notice</CardTitle>
-          <form onSubmit={handleSubmit((v) => createNotice(v))} className="space-y-4">
+          <form
+            onSubmit={handleSubmit((v) => {
+              // Switching audience leaves the previous select's value behind.
+              // Send only the id this target type actually uses — a stale or
+              // empty one fails the API's uuid check and reads as a mystery
+              // validation error.
+              const { targetBuildingId, targetTenantId, ...rest } = v
+              createNotice({
+                ...rest,
+                ...(v.targetType === 'BUILDING' && targetBuildingId ? { targetBuildingId } : {}),
+                ...(v.targetType === 'TENANT'   && targetTenantId   ? { targetTenantId }   : {}),
+              })
+            })}
+            className="space-y-4"
+          >
             <FormField label="Title" error={errors.title?.message} required>
               <Input {...register('title')} placeholder="Water supply maintenance this Saturday" />
             </FormField>
@@ -103,13 +164,38 @@ export default function OwnerNoticesPage() {
                   {...register('targetType')}
                   placeholder="Select audience"
                   options={[
-                    { value: 'ALL_BUILDINGS', label: 'All tenants' },
+                    // "All tenants" read as every tenant on the platform, which
+                    // is what the API used to do. It only ever means this owner.
+                    { value: 'ALL_BUILDINGS', label: 'All my buildings' },
                     { value: 'BUILDING',      label: 'One building' },
                     { value: 'TENANT',        label: 'Specific tenant' },
                   ]}
                 />
               </FormField>
             </div>
+
+            {/* The follow-up question the audience choice raises. Without it a
+                BUILDING or TENANT notice was published with no target and
+                silently reached nobody. */}
+            {targetType === 'BUILDING' && (
+              <FormField label="Which building" error={errors.targetBuildingId?.message} required>
+                <Select
+                  {...register('targetBuildingId')}
+                  placeholder={buildingOptions.length ? 'Select a building' : 'No buildings yet'}
+                  options={buildingOptions}
+                />
+              </FormField>
+            )}
+
+            {targetType === 'TENANT' && (
+              <FormField label="Which tenant" error={errors.targetTenantId?.message} required>
+                <Select
+                  {...register('targetTenantId')}
+                  placeholder={tenantOptions.length ? 'Select a tenant' : 'No tenants yet'}
+                  options={tenantOptions}
+                />
+              </FormField>
+            )}
 
             <FormField label="Message" error={errors.body?.message} required>
               <Textarea {...register('body')} rows={4} placeholder="Write your notice here..." />
