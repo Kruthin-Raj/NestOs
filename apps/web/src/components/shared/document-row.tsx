@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Eye, Download } from 'lucide-react'
+import { FileText, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
@@ -94,7 +94,9 @@ export function DocumentRow({ doc }: { doc: ReviewDocument }) {
         </div>
       </div>
 
-      {/* In-app Document Viewer Modal */}
+      {/* Mounted only while open, so zoom and rotation reset themselves the
+          next time it opens — the modal used to do that in an effect. */}
+      {isViewerOpen && (
       <DocumentViewerModal
         isOpen={isViewerOpen}
         onClose={handleCloseViewer}
@@ -104,6 +106,7 @@ export function DocumentRow({ doc }: { doc: ReviewDocument }) {
         documentType={doc.documentType}
         onDownload={handleDownload}
       />
+      )}
     </>
   )
 }
