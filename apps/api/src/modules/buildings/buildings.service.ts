@@ -208,6 +208,7 @@ export async function createBuildingService(
       rentDueDay: dto.rentDueDay as number,
       contactPhone: dto.contactPhone as string | undefined,
       contactEmail: dto.contactEmail as string | undefined,
+      googleMapsUrl: dto.googleMapsUrl as string | undefined,
       amenities: amenities.length
         ? {
             create: amenities.map((name) => ({ name })),
@@ -272,6 +273,7 @@ export async function updateBuildingService(
       ...(dto.rentDueDay !== undefined ? { rentDueDay: dto.rentDueDay as number } : {}),
       ...(dto.contactPhone !== undefined ? { contactPhone: dto.contactPhone as string } : {}),
       ...(dto.contactEmail !== undefined ? { contactEmail: dto.contactEmail as string } : {}),
+      ...(dto.googleMapsUrl !== undefined ? { googleMapsUrl: dto.googleMapsUrl as string } : {}),
       ...(amenities !== undefined
         ? {
             amenities: {

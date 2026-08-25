@@ -24,6 +24,7 @@ const buildingBaseSchema = z.object({
   // without a contact phone failed validation.
   contactPhone: optional(phoneNumber),
   contactEmail: optional(z.string().email()),
+  googleMapsUrl: optional(z.string().url('Must be a valid URL')),
   amenities: z.array(z.string().max(50)).max(20).optional(),
 })
 

@@ -34,6 +34,7 @@ const schema = z.object({
   description:      z.string().optional(),
   rules:            z.string().optional(),
   contactPhone:     optionalPhone,
+  googleMapsUrl:    z.string().url('Must be a valid URL').optional().or(z.literal('')),
 })
 
 // z.coerce.number() means the form's raw input type (unknown, straight from
@@ -190,6 +191,9 @@ export default function NewBuildingPage() {
                   />
                 )}
               />
+            </FormField>
+            <FormField label="Google Maps URL" error={errors.googleMapsUrl?.message} hint="Optional link to exact location">
+              <Input {...register('googleMapsUrl')} placeholder="https://maps.google.com/..." type="url" />
             </FormField>
           </div>
         </Card>
