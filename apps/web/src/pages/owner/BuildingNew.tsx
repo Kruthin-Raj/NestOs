@@ -12,8 +12,9 @@ import { CitySelect } from '@/components/ui/city-select'
 import { LocationPicker, type LatLng } from '@/components/ui/location-picker'
 import { PageHeader } from '@/components/shared/page-header'
 import { useCreateBuilding } from '@/features/owner/buildings/hooks/use-buildings'
+import { resolveMapUrl } from '@/features/owner/buildings/services/buildings.service'
 import { AMENITY_OPTIONS, INDIAN_STATES } from '@/lib/utils/constants'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { optionalPhone } from '@/lib/utils/phone'
 import { PhoneInput } from '@/components/ui/phone-input'
@@ -61,6 +62,22 @@ export default function NewBuildingPage() {
       prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
     )
   }
+
+  const googleMapsUrl = watch('googleMapsUrl')
+  useEffect(() => {
+    if (!googleMapsUrl || !googleMapsUrl.startsWith('http')) return
+    const timeout = setTimeout(async () => {
+      try {
+        const coords = await resolveMapUrl(googleMapsUrl)
+        if (coords.latitude && coords.longitude) {
+          setLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, 1000)
+    return () => clearTimeout(timeout)
+  }, [googleMapsUrl])
 
   function onSubmit(values: FormValues) {
     // Blank optional fields arrive as "" and are normalised away by the API

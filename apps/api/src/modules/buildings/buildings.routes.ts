@@ -71,6 +71,35 @@ export const buildingsRouter: ReturnType<typeof Router> = Router()
 
 buildingsRouter.use(authenticate, requireVerifiedOwner)
 
+buildingsRouter.get('/resolve-map-url',
+  validateQuery(z.object({ url: z.string().url() })),
+  asyncHandler(async (req, res) => {
+    const url = req.query.url as string
+    
+    const extractCoordinates = (u: string) => {
+      const match = u.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+      if (match) return { latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) }
+      return null
+    }
+
+    let coords = extractCoordinates(url)
+    
+    if (!coords && (url.includes('maps.app.goo.gl') || url.includes('goo.gl') || url.includes('g.page'))) {
+      try {
+        const response = await fetch(url, { redirect: 'manual' })
+        const location = response.headers.get('location')
+        if (location) {
+          coords = extractCoordinates(location)
+        }
+      } catch (e) {
+        // Ignore fetch errors
+      }
+    }
+
+    sendSuccess(res, 'Map URL resolved', coords || { latitude: null, longitude: null })
+  })
+)
+
 buildingsRouter.get('/',
   validateQuery(getBuildingsQuerySchema),
   asyncHandler(async (req, res) => {
