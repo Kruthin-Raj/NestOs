@@ -8,7 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardTitle } from '@/components/ui/card'
-import { PhoneInput } from '@/components/ui/phone-input'
+import { CitySelect } from '@/components/ui/city-select'
 import { LocationPicker, type LatLng } from '@/components/ui/location-picker'
 import { PageHeader } from '@/components/shared/page-header'
 import { useCreateBuilding } from '@/features/owner/buildings/hooks/use-buildings'
@@ -16,6 +16,7 @@ import { AMENITY_OPTIONS, INDIAN_STATES } from '@/lib/utils/constants'
 import { useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { optionalPhone } from '@/lib/utils/phone'
+import { PhoneInput } from '@/components/ui/phone-input'
 
 const schema = z.object({
   name:             z.string().min(3, 'Building name must be at least 3 characters'),
@@ -49,7 +50,7 @@ export default function NewBuildingPage() {
   // building cannot be made ACTIVE without them.
   const [location, setLocation] = useState<LatLng | null>(null)
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { rentDueDay: 5, depositMonths: 2, totalFloors: 1 },
   })
@@ -135,7 +136,18 @@ export default function NewBuildingPage() {
             </FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="City" error={errors.city?.message} required>
-                <Input {...register('city')} placeholder="Hyderabad" />
+                <Controller
+                  name="city"
+                  control={control}
+                  render={({ field }) => (
+                    <CitySelect
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onSelectState={(s) => setValue('state', s, { shouldValidate: true })}
+                      error={!!errors.city}
+                    />
+                  )}
+                />
               </FormField>
               <FormField label="Pincode" error={errors.pincode?.message} required>
                 <Input {...register('pincode')} placeholder="500084" maxLength={6} />

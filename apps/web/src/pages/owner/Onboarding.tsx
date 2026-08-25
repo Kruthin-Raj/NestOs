@@ -10,6 +10,7 @@ import { FormField } from '@/components/ui/form-field'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { requiredPhone } from '@/lib/utils/phone'
 import { useProfile } from '@/features/auth/hooks/use-auth'
+import { CitySelect } from '@/components/ui/city-select'
 import { Card, CardTitle } from '@/components/ui/card'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
@@ -39,7 +40,7 @@ export default function OwnerOnboardingPage() {
   const { data: full } = useProfile()
   const saved = full?.ownerProfile as Record<string, string | null> | undefined
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<ProfileValues>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
     // Prefill anything already stored so returning to onboarding does not mean
     // retyping everything. `values` re-syncs once the request resolves.
@@ -110,7 +111,18 @@ export default function OwnerOnboardingPage() {
             </FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="City" error={errors.city?.message} required>
-                <Input {...register('city')} placeholder="Hyderabad" />
+                <Controller
+                  name="city"
+                  control={control}
+                  render={({ field }) => (
+                    <CitySelect
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onSelectState={(s) => setValue('state', s, { shouldValidate: true })}
+                      error={!!errors.city}
+                    />
+                  )}
+                />
               </FormField>
               <FormField label="State" error={errors.state?.message} required>
                 <Input {...register('state')} placeholder="Telangana" />

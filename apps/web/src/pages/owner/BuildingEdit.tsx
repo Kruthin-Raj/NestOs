@@ -11,6 +11,7 @@ import { PhoneInput } from '@/components/ui/phone-input'
 import { LocationPicker, type LatLng } from '@/components/ui/location-picker'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardTitle } from '@/components/ui/card'
+import { CitySelect } from '@/components/ui/city-select'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { EmptyState } from '@/components/feedback/empty-state'
@@ -63,7 +64,7 @@ export default function EditBuildingPage() {
       : null
   const location = locationOverride ?? savedLocation
 
-  const { register, handleSubmit, control, formState: { errors } } =
+  const { register, handleSubmit, control, setValue, formState: { errors } } =
     useForm<FormInput, unknown, FormValues>({
       resolver: zodResolver(schema),
       values: {
@@ -153,7 +154,18 @@ export default function EditBuildingPage() {
             </FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="City" error={errors.city?.message} required>
-                <Input {...register('city')} />
+                <Controller
+                  name="city"
+                  control={control}
+                  render={({ field }) => (
+                    <CitySelect
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onSelectState={(s) => setValue('state', s, { shouldValidate: true })}
+                      error={!!errors.city}
+                    />
+                  )}
+                />
               </FormField>
               <FormField label="Pincode" error={errors.pincode?.message} required>
                 <Input {...register('pincode')} maxLength={6} />
