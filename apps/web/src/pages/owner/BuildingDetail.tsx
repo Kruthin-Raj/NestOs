@@ -16,6 +16,7 @@ import {
 } from '@/features/owner/buildings/hooks/use-buildings'
 import { formatRupees } from '@/lib/utils/format'
 import type { Floor } from '@/types'
+import { ReadOnlyMap } from '@/components/ui/read-only-map'
 
 export default function BuildingDetailPage() {
   const buildingId      = useRequiredParam('buildingId')
@@ -100,6 +101,12 @@ export default function BuildingDetailPage() {
           </div>
         )}
       </Card>
+
+      {building.latitude && building.longitude && (
+        <Card className="p-0 overflow-hidden">
+          <ReadOnlyMap latitude={building.latitude} longitude={building.longitude} />
+        </Card>
+      )}
 
       {/* Floors / rooms section */}
       <div className="flex items-center justify-between">
