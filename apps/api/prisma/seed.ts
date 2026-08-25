@@ -8,25 +8,37 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
+/**
+ * The project's admin address. Because this is an upsert on email, seeding the
+ * shared database leaves the existing admin alone instead of adding a second
+ * one — which is what happened while this pointed at a placeholder address
+ * nobody could receive mail at.
+ *
+ * Override with SEED_ADMIN_EMAIL when seeding your own local database.
+ */
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "nestossupport@gmail.com";
+
 async function main() {
   console.log("Seeding database...");
 
   const admin = await prisma.user.upsert({
-    where: { email: "admin@nestos.in" },
+    where: { email: ADMIN_EMAIL },
     update: {},
     create: {
-      email: "admin@nestos.in",
+      email: ADMIN_EMAIL,
       role: UserRole.SUPER_ADMIN,
       isEmailVerified: true,
       isActive: true,
     },
   });
 
-  console.log(`✓ Super Admin created: ${admin.email}`);
+  console.log(`✓ Super Admin ready: ${admin.email}`);
   console.log("\nDatabase seeded successfully.");
   console.log("\nTest accounts:");
-  console.log("  Super Admin: admin@nestos.in");
-  console.log("  (Use OTP login — OTP logged to console in development)");
+  console.log(`  Super Admin: ${admin.email}`);
+  // No password is created here, and sign-in is by password — an OTP is only
+  // used to confirm an address at signup or to authorise a reset.
+  console.log(`  Set a password with: pnpm user:set-password ${admin.email} '<password>'`);
 }
 
 main()

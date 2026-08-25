@@ -10,7 +10,9 @@ import bcrypt from "bcryptjs";
  *
  * Normally unnecessary — anyone can set their own password through "Forgot
  * password", which emails a code. This exists for accounts whose address cannot
- * receive mail, such as the seeded admin@nestos.in, and for local development.
+ * receive mail, for local development, and for admins: `pnpm admin:create` and
+ * `pnpm db:seed` both create the account without a password, so one of them
+ * plus this command is the only way to get an admin signed in.
  */
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
