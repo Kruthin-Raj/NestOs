@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { useMe, useProfile, useUpdateProfile } from '@/features/auth/hooks/use-auth'
+import { CitySelect } from '@/components/ui/city-select'
 import { optionalPhone } from '@/lib/utils/phone'
 
 const schema = z.object({
@@ -29,7 +30,7 @@ export default function OwnerSettingsPage() {
 
   const profile = full?.ownerProfile as Record<string, string | null> | undefined
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     // `values` (not `defaultValues`) — defaultValues is only read on the first
     // render, which happens before the profile request resolves. That is why
@@ -106,10 +107,21 @@ export default function OwnerSettingsPage() {
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="City">
-              <Input {...register('city')} />
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => (
+                  <CitySelect
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onSelectState={(state) => setValue('state', state)}
+                    placeholder="Select city..."
+                  />
+                )}
+              />
             </FormField>
             <FormField label="State">
-              <Input {...register('state')} />
+              <Input {...register('state')} placeholder="Auto-filled" />
             </FormField>
           </div>
           <Button type="submit" loading={isPending}>

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CitySelect } from '@/components/ui/city-select'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { FormField } from '@/components/ui/form-field'
@@ -176,7 +177,17 @@ export default function TenantSettingsPage() {
               />
             </FormField>
             <FormField label="City">
-              <Input {...regProfile('city')} />
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => (
+                  <CitySelect
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    placeholder="Select your city..."
+                  />
+                )}
+              />
             </FormField>
           </div>
           <div className="border-t pt-4">

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { CheckCircle, Circle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CitySelect } from '@/components/ui/city-select'
 import { Select } from '@/components/ui/select'
 import { FormField } from '@/components/ui/form-field'
 import { PhoneInput } from '@/components/ui/phone-input'
@@ -184,7 +185,18 @@ export default function TenantOnboardingPage() {
             </FormField>
 
             <FormField label="City" error={profileForm.formState.errors.city?.message} required>
-              <Input {...profileForm.register('city')} placeholder="Hyderabad" />
+              <Controller
+                name="city"
+                control={profileForm.control}
+                render={({ field }) => (
+                  <CitySelect
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    placeholder="Select your city..."
+                    error={!!profileForm.formState.errors.city}
+                  />
+                )}
+              />
             </FormField>
 
             <div className="border-t pt-4">
