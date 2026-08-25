@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Search, MapPin, LocateFixed, X } from 'lucide-react'
+import { MapPin, LocateFixed, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { CitySelect } from '@/components/ui/city-select'
 import { Select } from '@/components/ui/select'

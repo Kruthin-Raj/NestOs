@@ -29,10 +29,16 @@ export function CitySelect({
   const [search, setSearch] = useState(value)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Keep search in sync with external value changes
-  useEffect(() => {
+  // Keep search in sync with external value changes.
+  //
+  // Adjusted during render rather than in an effect: an effect would render
+  // once with the stale text, then immediately re-render with the new one, and
+  // the compiler flags it as a cascading render.
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== prevValue) {
+    setPrevValue(value)
     setSearch(value)
-  }, [value])
+  }
 
   // Handle click outside to close dropdown
   useEffect(() => {
