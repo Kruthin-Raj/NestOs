@@ -72,7 +72,7 @@ export default function NewBuildingPage() {
         if (coords.latitude && coords.longitude) {
           setLocation({ latitude: coords.latitude, longitude: coords.longitude })
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }, 1000)

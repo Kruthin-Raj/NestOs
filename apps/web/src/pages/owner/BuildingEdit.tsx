@@ -88,16 +88,6 @@ export default function EditBuildingPage() {
       },
     })
 
-  if (isLoading) return <PageLoader />
-  if (!building) return <EmptyState title="Building not found" />
-
-  function toggleAmenity(name: string) {
-    setAmenityOverride((prev) => {
-      const base = prev ?? savedAmenities
-      return base.includes(name) ? base.filter((a) => a !== name) : [...base, name]
-    })
-  }
-
   const googleMapsUrl = watch('googleMapsUrl')
   useEffect(() => {
     if (!googleMapsUrl || !googleMapsUrl.startsWith('http')) return
@@ -107,12 +97,22 @@ export default function EditBuildingPage() {
         if (coords.latitude && coords.longitude) {
           setLocationOverride({ latitude: coords.latitude, longitude: coords.longitude })
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }, 1000)
     return () => clearTimeout(timeout)
-  }, [googleMapsUrl])
+  }, [googleMapsUrl, setLocationOverride])
+
+  if (isLoading) return <PageLoader />
+  if (!building) return <EmptyState title="Building not found" />
+
+  function toggleAmenity(name: string) {
+    setAmenityOverride((prev) => {
+      const base = prev ?? savedAmenities
+      return base.includes(name) ? base.filter((a) => a !== name) : [...base, name]
+    })
+  }
 
   function onSubmit(values: FormValues) {
     update(
