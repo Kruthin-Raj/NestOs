@@ -105,11 +105,21 @@ export default function OwnerNoticesPage() {
     (b: { id: string; name: string }) => ({ value: b.id, label: b.name })
   )
 
+  // Room number alone is ambiguous once an owner has more than one building —
+  // two properties can both have a Room 101.
   const tenantOptions = (tenantData?.items ?? []).map(
-    (t: { id: string; fullName: string; room?: { roomNumber: string } }) => ({
-      value: t.id,
-      label: t.room ? `${t.fullName} — Room ${t.room.roomNumber}` : t.fullName,
-    })
+    (t: {
+      id: string; fullName: string
+      building?: { name: string }
+      room?:     { roomNumber: string }
+    }) => {
+      const where = [
+        t.building?.name,
+        t.room ? `Room ${t.room.roomNumber}` : null,
+      ].filter(Boolean).join(' · ')
+
+      return { value: t.id, label: where ? `${t.fullName} — ${where}` : t.fullName }
+    }
   )
 
   const notices: Notice[] = data?.items ?? []
