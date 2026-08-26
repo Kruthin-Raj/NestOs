@@ -3,6 +3,16 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, UserRole, OwnerVerificationStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+/**
+ * Creates a pre-verified owner for local development.
+ *
+ *   pnpm owner:create owner@example.com [password] [full name]
+ *
+ * DEVELOPMENT ONLY. Two things make this unsafe against a real database:
+ * it skips admin verification entirely, and run against an email that already
+ * exists it OVERWRITES that owner's password and force-verifies them. Omitting
+ * the password argument leaves a verified owner on a documented default.
+ */
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 

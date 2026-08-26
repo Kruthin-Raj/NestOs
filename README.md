@@ -14,6 +14,9 @@ property owners and tenants.
 >
 > **Putting it online?** Read [Before you deploy](#before-you-deploy) first — HTTPS and
 > cookie settings decide whether login works at all.
+>
+> **Joining the team?** We share one database — read
+> [Working as a team](#working-as-a-team) before running anything destructive.
 
 ## Tech Stack
 
@@ -219,17 +222,25 @@ in a nearby search — it is still found by city.
 
 ### 1. Database Setup (Supabase)
 
-We use Supabase for free PostgreSQL hosting.
+Supabase hosts our PostgreSQL, and **contributors share one project** — see
+[Working as a team](#working-as-a-team). Ask for the connection string rather than
+creating your own project.
 
-1. Go to [supabase.com](https://supabase.com) and create a free account.
-2. Click **"New Project"**, name it `nestos`, create a strong database password, and pick
-   a region close to you.
-3. Wait a few minutes for the project to be provisioned.
-4. Go to **Project Settings → Database**.
-5. Under **Connection string**, select **URI**. It looks like:
-   `postgresql://postgres:<YOUR-PASSWORD>@db.<YOUR-PROJECT-REF>.supabase.co:5432/postgres`
+In the Supabase dashboard, open **Connect** and copy the **Session pooler** URI:
 
-Everyone uses their **own** Supabase project. Don't share connection strings.
+```
+postgresql://postgres.<PROJECT-REF>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres
+```
+
+Note the username is `postgres.<PROJECT-REF>`, not plain `postgres`.
+
+**Do not use the direct connection** (`db.<PROJECT-REF>.supabase.co`). It has no IPv4
+address on the free plan, so on any IPv4-only network — most college and office WiFi — it
+fails with `Can't reach database server` and no amount of code will fix it. The pooler is
+dual-stack.
+
+Use **Session pooler (5432)**, not **Transaction pooler (6543)**: transaction mode has no
+prepared statements, so `pnpm db:push` and `prisma migrate` fail against it.
 
 ### 2. Configure Environment Variables
 
@@ -242,14 +253,28 @@ your own — never commit the filled-in file.
 cp apps/api/.env.example apps/api/.env
 ```
 
-Then set `DATABASE_URL` to your own Supabase connection string (replace both
-`<YOUR-PASSWORD>` and `<YOUR-PROJECT-REF>`), and generate your own JWT secrets — for
-example with `openssl rand -hex 32`.
+Set `DATABASE_URL` to the shared pooler string from step 1, and generate your own JWT
+secrets (they only sign cookies from your local API, so they need not match anyone
+else's):
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**`EMAIL_*` can stay as placeholders.** In development the one-time code prints to the
+API terminal, so signup and password reset work with no mail server:
+
+```
+🔥 DEV OTP for you@example.com: 123456
+```
+
+For real delivery, `EMAIL_PASSWORD` must be a 16-character Gmail **App Password**
+generated on the account in `EMAIL_USER`, not your account password.
 
 The API **will not start** without `DATABASE_URL`, `JWT_ACCESS_SECRET`,
 `JWT_REFRESH_SECRET`, `EMAIL_HOST`, `EMAIL_USER` and `EMAIL_PASSWORD`. It exits with a
-message naming the missing variable. For Gmail, `EMAIL_PASSWORD` must be an **App
-Password**, not your account password.
+message naming the missing variable — placeholders satisfy it, absence does not. Define
+each key exactly once; a duplicate silently keeps the last.
 
 `FRONTEND_URL` must exactly match the origin the web app runs on, or CORS will reject
 every request.
@@ -430,6 +455,30 @@ POST   /owner/visits/:visitId/cancel
 
 ---
 
+## Notices
+
+An owner posts an announcement; the tenants it applies to see it on their dashboard.
+`Notice.targetType` decides who "applies":
+
+| targetType | Reaches | UI label |
+|---|---|---|
+| `ALL_BUILDINGS` | every tenant of **that owner** | All my buildings |
+| `BUILDING` | tenants with a booking in one building | One building |
+| `FLOOR` / `ROOM` | tenants on that floor / in that room | *(API only)* |
+| `TENANT` | one named tenant | Specific tenant |
+
+Audience rules live in **`tenantNoticeScope`** (`notices.service.ts`), shared by the list,
+the unread badge and mark-all-read so the three cannot disagree. Change them there, not at
+the call sites. Two rules that have each been broken once:
+
+- `ALL_BUILDINGS` means *that owner's* buildings, never every building on the platform.
+- Every other target type requires its id, or the notice reaches nobody while still
+  reporting success.
+
+Visibility follows **confirmed** bookings only.
+
+---
+
 ## Accounts and passwords
 
 Sign in is **email + password**. A one-time code is only used to confirm an address at
@@ -445,13 +494,16 @@ signup and to authorise a password reset.
 nullable, so nothing needed migrating: logging in returns `PASSWORD_NOT_SET` and the UI
 sends you to *Forgot password* to set one. That is the normal path for any older account.
 
-For an account whose inbox cannot receive mail — the seeded `admin@nestos.in` — set one
-directly instead:
+For an account whose inbox cannot receive mail, set one directly instead:
 
 ```bash
 cd apps/api
-pnpm user:set-password admin@nestos.in 'YourAdminPassword1'
+pnpm user:set-password someone@example.com 'YourPassword1'
 ```
+
+This is also the fastest way to fix an admin, since `pnpm admin:create` creates the
+account with **no password at all** — it predates password login — and you cannot sign in
+until you run the command above.
 
 Admins cannot sign up: `auth.validation.ts` restricts self-signup to `OWNER` and `TENANT`.
 Create one with `pnpm admin:create <email>`.
@@ -482,18 +534,27 @@ Admins cannot sign up — `auth.validation.ts` restricts self-signup to `OWNER` 
 
 ```bash
 cd apps/api
-pnpm admin:create you@example.com     # or use the seeded admin@nestos.in
+pnpm admin:create you@example.com
+pnpm user:set-password you@example.com 'YourAdminPassword1'
 ```
 
-The seeded `admin@nestos.in` cannot receive mail, so give it a password directly:
+Both commands are needed: `admin:create` does not set a password, so without the second
+one there is no way to sign in. Then sign in at `/login` and open `/admin`.
+
+We share a database, so there is normally **one admin already** — ask rather than creating
+another. `pnpm db:seed` upserts that same admin, so it is safe to run;
+`SEED_ADMIN_EMAIL=you@example.com pnpm db:seed` targets your own local database instead.
+
+### Skipping owner verification locally
 
 ```bash
-pnpm user:set-password admin@nestos.in 'YourAdminPassword1'
+pnpm owner:create owner@example.com 'ChosenPassword1' 'Owner Name'
 ```
 
-Then sign in at `/login` and open `/admin`.
+Creates a pre-verified owner. **Development only** — pointed at an existing email it
+overwrites that owner's password and force-verifies them.
 
-To skip the whole gate while developing, open `pnpm db:studio` and set
+Or open `pnpm db:studio` and set
 `owner_profiles.verificationStatus` to `VERIFIED` directly.
 
 ## Before you deploy
@@ -554,8 +615,11 @@ tile provider (MapTiler, Stadia, Carto — these do need keys) or self-host. Onl
 
 A free Supabase project **pauses after about 7 days of inactivity** — a sudden "Can't
 reach database" usually means resuming it from the dashboard rather than a code problem.
-It also has connection limits; one long-running API process is fine, many instances would
-want the connection pooler.
+The other common cause of that same message is using the direct connection on an
+IPv4-only network; see [Database Setup](#1-database-setup-supabase).
+
+Connections go through the Session pooler already, which is what you want with several
+contributors running the API at once. Free-tier connection limits still apply.
 
 ### 6. Accept what is deliberately manual
 
@@ -669,7 +733,9 @@ Actively under development. Check here before assuming something you wrote is br
 | 12 | The admin UI covers owner verification and tenant identity only. There is no user management, and a rejected owner or tenant can only resubmit by re-uploading documents. |
 | 13 | Payment confirmation is a manual trust step — see [Before you deploy](#before-you-deploy). |
 | 14 | Uploads live on local disk and do not survive a redeploy on an ephemeral filesystem — see [Before you deploy](#before-you-deploy). |
-| 15 | A building with no coordinates cannot appear in a nearby search. Older buildings predate the map picker. |
+| 15 | A building with no coordinates cannot appear in a nearby search. Older buildings predate the map picker. City search is unaffected. |
+| 16 | The database was built with `db:push`, which records no migration history, so `prisma migrate status` reports `init` as unapplied. Harmless now; the first `migrate deploy` will fail on tables that already exist. |
+| 17 | Contributors share one database, so a destructive command or a schema push affects everyone — see [Working as a team](#working-as-a-team). |
 
 ### Fixed
 
@@ -716,10 +782,34 @@ and the owner settings form defined a Zod schema that was never wired to a resol
 
 ---
 
-## Collaboration
+## Working as a team
+
+**We share one Supabase project**, so the accounts and buildings you see are your
+teammates'. Consequences:
+
+- `pnpm db:reset` and `db push --force-reset` **wipe everyone's data**. Ask first.
+- `pnpm db:push` applies your `schema.prisma` to the shared database — tell the others so
+  they can run `pnpm db:generate`.
+- Prefix throwaway accounts (`test-kruthin@…`) and delete them afterwards.
+- It holds real PII: Aadhaar numbers, phone numbers, payment references.
+
+To break things freely, run Postgres locally and point only your own `DATABASE_URL` at it:
+
+```bash
+docker run -d --name nestos-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=nestos \
+  -p 5433:5432 postgres:16-alpine
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5433/nestos
+```
+
+Share the connection string through a password manager, never a commit or a chat log.
+`EMAIL_*` never needs sharing.
+
+### Before you push
 
 - Branch off `main`; never commit to `main` directly.
-- Run `pnpm lint` and `pnpm build` in **both** apps before pushing.
-- Keep commits scoped — one concern per commit.
+- Run `pnpm lint` in **both** apps and `pnpm build` in `apps/web`. Zero lint errors.
+  Note that `apps/api`'s `lint` is `tsc --noEmit` — a type check, not ESLint.
+- Keep commits scoped — one concern per commit, and make the message match what the
+  commit actually changes.
 - Update this README when you change setup steps, conventions, or fix anything in
   [Known issues](#known-issues).

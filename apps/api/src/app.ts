@@ -47,11 +47,18 @@ export function createApp(): Application {
 
   app.use(cors({
     origin: (origin, callback) => {
-      // allow requests with no origin (like mobile apps or curl requests)
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true)
-      }
-      return callback(null, true) // allow all in dev
+      // No Origin header at all: curl, server-to-server, same-origin requests.
+      if (!origin) return callback(null, true)
+
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+
+      // Anything goes locally, so a teammate on a different port is not blocked.
+      // This MUST stay gated on the environment: both branches used to return
+      // true unconditionally, which combined with credentials: true reflected
+      // every origin in production as well.
+      if (env.isDevelopment) return callback(null, true)
+
+      return callback(new Error('Not allowed by CORS'))
     },
     credentials: true,       // required for cookies to be sent cross-origin
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],

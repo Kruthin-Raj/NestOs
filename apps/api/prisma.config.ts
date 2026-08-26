@@ -8,6 +8,9 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: env("DIRECT_URL") || env("DATABASE_URL"),
+    // env() throws when the variable is missing, so `env("DIRECT_URL") || …`
+    // never reached the fallback — every Prisma command failed for anyone
+    // without DIRECT_URL set. Read the optional one off process.env instead.
+    url: process.env.DIRECT_URL ?? env("DATABASE_URL"),
   },
 });
