@@ -52,7 +52,7 @@ export default function NewBuildingPage() {
   // building cannot be made ACTIVE without them.
   const [location, setLocation] = useState<LatLng | null>(null)
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
+  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { rentDueDay: 5, depositMonths: 2, totalFloors: 1 },
   })
