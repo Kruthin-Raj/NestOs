@@ -12,8 +12,9 @@ import { CitySelect } from '@/components/ui/city-select'
 import { LocationPicker, type LatLng } from '@/components/ui/location-picker'
 import { PageHeader } from '@/components/shared/page-header'
 import { useCreateBuilding } from '@/features/owner/buildings/hooks/use-buildings'
+import { resolveMapUrl } from '@/features/owner/buildings/services/buildings.service'
 import { AMENITY_OPTIONS, INDIAN_STATES } from '@/lib/utils/constants'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { optionalPhone } from '@/lib/utils/phone'
 import { PhoneInput } from '@/components/ui/phone-input'
@@ -34,6 +35,7 @@ const schema = z.object({
   description:      z.string().optional(),
   rules:            z.string().optional(),
   contactPhone:     optionalPhone,
+  googleMapsUrl:    z.string().url('Must be a valid URL').optional().or(z.literal('')),
 })
 
 // z.coerce.number() means the form's raw input type (unknown, straight from
@@ -50,7 +52,7 @@ export default function NewBuildingPage() {
   // building cannot be made ACTIVE without them.
   const [location, setLocation] = useState<LatLng | null>(null)
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
+  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { rentDueDay: 5, depositMonths: 2, totalFloors: 1 },
   })
@@ -60,6 +62,22 @@ export default function NewBuildingPage() {
       prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
     )
   }
+
+  const googleMapsUrl = watch('googleMapsUrl')
+  useEffect(() => {
+    if (!googleMapsUrl || !googleMapsUrl.startsWith('http')) return
+    const timeout = setTimeout(async () => {
+      try {
+        const coords = await resolveMapUrl(googleMapsUrl)
+        if (coords.latitude && coords.longitude) {
+          setLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        }
+      } catch {
+        // ignore
+      }
+    }, 1000)
+    return () => clearTimeout(timeout)
+  }, [googleMapsUrl])
 
   function onSubmit(values: FormValues) {
     // Blank optional fields arrive as "" and are normalised away by the API
@@ -190,6 +208,9 @@ export default function NewBuildingPage() {
                   />
                 )}
               />
+            </FormField>
+            <FormField label="Google Maps URL" error={errors.googleMapsUrl?.message} hint="Optional link to exact location">
+              <Input {...register('googleMapsUrl')} placeholder="https://maps.google.com/..." type="url" />
             </FormField>
           </div>
         </Card>

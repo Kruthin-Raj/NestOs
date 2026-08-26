@@ -4,6 +4,7 @@ import { authenticate, optionalAuth } from '@middleware/auth.middleware'
 import { requireVerifiedOwner } from '@middleware/rbac.middleware'
 import { validate, validateQuery } from '@middleware/validate.middleware'
 import { asyncHandler } from '@utils/async-handler'
+import { logger } from '@utils/logger'
 import { sendSuccess, sendCreated, sendNoContent } from '@utils/response.util'
 import {
   createBuildingSchema, updateBuildingSchema, getBuildingsQuerySchema
@@ -70,6 +71,59 @@ publicBuildingsRouter.get('/:buildingId/public',
 export const buildingsRouter: ReturnType<typeof Router> = Router()
 
 buildingsRouter.use(authenticate, requireVerifiedOwner)
+
+/**
+ * Hosts this endpoint is willing to make a request to.
+ *
+ * Matched against the parsed hostname, never as a substring of the whole URL:
+ * `url.includes('goo.gl')` also matches `http://169.254.169.254/?x=goo.gl`,
+ * which would have the server fetch an internal address on a caller's behalf.
+ */
+const SHORT_LINK_HOSTS = ['maps.app.goo.gl', 'goo.gl', 'g.page']
+
+function isShortLink(raw: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(raw)
+    return (protocol === 'https:' || protocol === 'http:')
+      && SHORT_LINK_HOSTS.includes(hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
+buildingsRouter.get('/resolve-map-url',
+  validateQuery(z.object({ url: z.string().url() })),
+  asyncHandler(async (req, res) => {
+    const url = req.query.url as string
+
+    const extractCoordinates = (u: string) => {
+      const match = u.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+      if (match) return { latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) }
+      return null
+    }
+
+    let coords = extractCoordinates(url)
+
+    if (!coords && isShortLink(url)) {
+      try {
+        // redirect: 'manual' — we only want the Location header. Following the
+        // redirect would hand an attacker a second, unchecked hop.
+        const response = await fetch(url, { redirect: 'manual' })
+        const location = response.headers.get('location')
+        if (location) {
+          coords = extractCoordinates(location)
+        }
+      } catch (err) {
+        // A shortener being unreachable is a normal outcome, not a failure of
+        // the request — the caller just gets nulls back. Logged rather than
+        // swallowed so it is visible when every resolve suddenly stops working.
+        logger.warn(`Could not resolve short link: ${(err as Error).message}`, 'Buildings')
+      }
+    }
+
+    sendSuccess(res, 'Map URL resolved', coords || { latitude: null, longitude: null })
+  })
+)
 
 buildingsRouter.get('/',
   validateQuery(getBuildingsQuerySchema),

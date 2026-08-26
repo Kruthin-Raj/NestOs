@@ -79,6 +79,7 @@ export interface Building {
   rentDueDay: number
   contactPhone?: string
   contactEmail?: string
+  googleMapsUrl?: string
   totalBeds: number
   occupiedBeds: number
   amenities: Array<{ name: string }>

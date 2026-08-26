@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { EmptyState } from '@/components/feedback/empty-state'
 import { useBuilding, useUpdateBuilding } from '@/features/owner/buildings/hooks/use-buildings'
+import { resolveMapUrl } from '@/features/owner/buildings/services/buildings.service'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { AMENITY_OPTIONS, INDIAN_STATES } from '@/lib/utils/constants'
 import { optionalPhone } from '@/lib/utils/phone'
@@ -38,6 +39,7 @@ const schema = z.object({
   description:      z.string().optional(),
   rules:            z.string().optional(),
   contactPhone:     optionalPhone,
+  googleMapsUrl:    z.string().url('Must be a valid URL').optional().or(z.literal('')),
 })
 
 type FormInput  = z.input<typeof schema>
@@ -64,7 +66,7 @@ export default function EditBuildingPage() {
       : null
   const location = locationOverride ?? savedLocation
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } =
+  const { register, handleSubmit, control, setValue, watch, formState: { errors } } =
     useForm<FormInput, unknown, FormValues>({
       resolver: zodResolver(schema),
       values: {
@@ -82,8 +84,25 @@ export default function EditBuildingPage() {
         description:      building?.description      ?? '',
         rules:            building?.rules            ?? '',
         contactPhone:     building?.contactPhone     ?? '',
+        googleMapsUrl:    building?.googleMapsUrl    ?? '',
       },
     })
+
+  const googleMapsUrl = watch('googleMapsUrl')
+  useEffect(() => {
+    if (!googleMapsUrl || !googleMapsUrl.startsWith('http')) return
+    const timeout = setTimeout(async () => {
+      try {
+        const coords = await resolveMapUrl(googleMapsUrl)
+        if (coords.latitude && coords.longitude) {
+          setLocationOverride({ latitude: coords.latitude, longitude: coords.longitude })
+        }
+      } catch {
+        // ignore
+      }
+    }, 1000)
+    return () => clearTimeout(timeout)
+  }, [googleMapsUrl, setLocationOverride])
 
   if (isLoading) return <PageLoader />
   if (!building) return <EmptyState title="Building not found" />
@@ -207,6 +226,9 @@ export default function EditBuildingPage() {
                   />
                 )}
               />
+            </FormField>
+            <FormField label="Google Maps URL" error={errors.googleMapsUrl?.message} hint="Optional link to exact location">
+              <Input {...register('googleMapsUrl')} placeholder="https://maps.google.com/..." type="url" />
             </FormField>
           </div>
         </Card>

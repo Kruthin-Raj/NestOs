@@ -16,6 +16,7 @@ import {
 } from '@/features/owner/buildings/hooks/use-buildings'
 import { formatRupees } from '@/lib/utils/format'
 import type { Floor } from '@/types'
+import { ReadOnlyMap } from '@/components/ui/read-only-map'
 
 export default function BuildingDetailPage() {
   const buildingId      = useRequiredParam('buildingId')
@@ -83,6 +84,11 @@ export default function BuildingDetailPage() {
             {building.addressLine2 && <p>{building.addressLine2}</p>}
             {building.landmark && <p className="text-gray-400">{building.landmark}</p>}
             <p>{building.city}, {building.state} – {building.pincode}</p>
+            {building.googleMapsUrl && (
+              <a href={building.googleMapsUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline mt-1 inline-block text-sm">
+                View on Google Maps
+              </a>
+            )}
           </div>
         </div>
         {building.amenities?.length > 0 && (
@@ -95,6 +101,12 @@ export default function BuildingDetailPage() {
           </div>
         )}
       </Card>
+
+      {building.latitude && building.longitude && (
+        <Card className="p-0 overflow-hidden">
+          <ReadOnlyMap latitude={building.latitude} longitude={building.longitude} />
+        </Card>
+      )}
 
       {/* Floors / rooms section */}
       <div className="flex items-center justify-between">

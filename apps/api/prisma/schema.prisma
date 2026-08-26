@@ -432,6 +432,7 @@ model Building {
   rentDueDay        Int             @default(1)
   contactPhone      String?
   contactEmail      String?
+  googleMapsUrl     String?
   totalBeds         Int             @default(0)
   occupiedBeds      Int             @default(0)
   createdAt         DateTime        @default(now())

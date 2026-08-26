@@ -30,3 +30,8 @@ export async function updateBuildingStatus(id: string, status: 'ACTIVE' | 'INACT
 export async function deleteBuilding(id: string) {
   await apiClient.delete(`/buildings/${id}`)
 }
+
+export async function resolveMapUrl(url: string) {
+  const { data } = await apiClient.get<ApiResponse<{ latitude: number | null; longitude: number | null }>>(`/buildings/resolve-map-url?url=${encodeURIComponent(url)}`)
+  return data.data
+}
