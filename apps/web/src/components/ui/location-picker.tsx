@@ -94,7 +94,8 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Recentre when a saved value arrives after the map has mounted (edit page).
+  // Recentre when a saved value arrives after the map has mounted (edit page)
+  // or when the parent explicitly updates the value (e.g., parsing a Maps URL).
   useEffect(() => {
     const map = mapRef.current
     if (!map || !value) return
@@ -110,6 +111,12 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       })
       markerRef.current = marker
       map.setView([value.latitude, value.longitude], 16)
+    } else {
+      const currentPos = markerRef.current.getLatLng()
+      if (currentPos.lat !== value.latitude || currentPos.lng !== value.longitude) {
+        markerRef.current.setLatLng([value.latitude, value.longitude])
+        map.setView([value.latitude, value.longitude], 16)
+      }
     }
   }, [value])
 
