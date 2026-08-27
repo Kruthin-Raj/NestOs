@@ -65,10 +65,11 @@ export default function NewBuildingPage() {
 
   const googleMapsUrl = watch('googleMapsUrl')
   useEffect(() => {
-    if (!googleMapsUrl || !googleMapsUrl.startsWith('http')) return
+    const url = googleMapsUrl?.trim()
+    if (!url || !url.startsWith('http')) return
     const timeout = setTimeout(async () => {
       try {
-        const coords = await resolveMapUrl(googleMapsUrl)
+        const coords = await resolveMapUrl(url)
         if (coords.latitude && coords.longitude) {
           setLocation({ latitude: coords.latitude, longitude: coords.longitude })
         }
