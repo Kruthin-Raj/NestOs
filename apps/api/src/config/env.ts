@@ -59,6 +59,9 @@ export const env = {
   // File Storage — local disk (uploads/ directory)
   UPLOAD_DIR: optionalEnv('UPLOAD_DIR', 'uploads'),
 
+  // Business Rules
+  REJECTION_FLAG_THRESHOLD: parseInt(optionalEnv('REJECTION_FLAG_THRESHOLD', '3'), 10),
+
   // CORS
   FRONTEND_URL: optionalEnv('FRONTEND_URL', 'http://localhost:3000'),
 } as const

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardTitle } from '@/components/ui/card'
@@ -12,6 +12,7 @@ import { PageLoader } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
 import { formatDateTime } from '@/lib/utils/format'
+import { cn } from '@/lib/utils/cn'
 
 const PENDING_OWNERS_KEY = ['admin', 'owners', 'pending'] as const
 
@@ -24,7 +25,17 @@ type PendingOwner = {
   panNumber: string | null
   aadhaarNumber: string | null
   createdAt: string
-  user: { email: string; createdAt: string }
+  user: {
+    id: string
+    email: string
+    phone: string | null
+    status: string
+    rejectionCount: number
+    createdAt: string
+    rejections?: Array<{ id: string; reason: string; createdAt: string }>
+  }
+  isFlagged?: boolean
+  lastRejectionReason?: string | null
   documents: ReviewDocument[]
 }
 
@@ -93,7 +104,14 @@ function OwnerReviewCard({ owner }: { owner: PendingOwner }) {
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <CardTitle>{owner.fullName || '(name not set)'}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>{owner.fullName || '(name not set)'}</CardTitle>
+            {owner.isFlagged && (
+              <Badge variant="danger" className="text-xs">
+                ⚠️ Flagged ({owner.user.rejectionCount} rejections)
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-gray-500">{owner.user.email}</p>
           {owner.businessName && (
             <p className="text-sm text-gray-500">{owner.businessName}</p>
@@ -105,6 +123,29 @@ function OwnerReviewCard({ owner }: { owner: PendingOwner }) {
         </div>
         <Badge variant="warning">Under review</Badge>
       </div>
+
+      {owner.user.rejectionCount > 0 && (
+        <div
+          className={cn(
+            'p-3 rounded-lg text-xs mt-3 flex items-start gap-2',
+            owner.isFlagged
+              ? 'bg-red-50 text-red-900 border border-red-200'
+              : 'bg-amber-50 text-amber-900 border border-amber-200'
+          )}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+          <div>
+            <span className="font-semibold">
+              {owner.user.rejectionCount} Previous Rejection(s)
+            </span>
+            {owner.lastRejectionReason && (
+              <p className="mt-0.5 text-gray-700">
+                Latest Reason: &quot;{owner.lastRejectionReason}&quot;
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Identity numbers are shown because verifying them is the point of this
           screen. They are not logged anywhere. */}

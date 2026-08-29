@@ -2,13 +2,13 @@ import { Badge } from '../ui/badge'
 import type {
   BuildingStatus, BedStatus, BookingStatus,
   PaymentStatus, IssueStatus, IssuePriority,
-  OwnerVerificationStatus, TenantStatus,
+  OwnerVerificationStatus, TenantStatus, UserStatus,
 } from '@/types'
 
 type AnyStatus =
   | BuildingStatus | BedStatus | BookingStatus
   | PaymentStatus  | IssueStatus | IssuePriority
-  | OwnerVerificationStatus | TenantStatus
+  | OwnerVerificationStatus | TenantStatus | UserStatus
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple'
 
@@ -19,11 +19,16 @@ const STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> = {
   INACTIVE:    { label: 'Inactive',    variant: 'default' },
   UNDER_REVIEW:{ label: 'Under Review',variant: 'warning' },
 
+  // User
+  SUSPENDED:   { label: 'Suspended',   variant: 'warning' },
+  DEACTIVATED: { label: 'Deactivated', variant: 'default' },
+  BLOCKED:     { label: 'Blocked',     variant: 'danger' },
+
   // Bed
   VACANT:      { label: 'Vacant',      variant: 'success' },
   RESERVED:    { label: 'Reserved',    variant: 'warning' },
   OCCUPIED:    { label: 'Occupied',    variant: 'info' },
-  BLOCKED:     { label: 'Blocked',     variant: 'default' },
+  BLOCKED_BED: { label: 'Blocked',     variant: 'default' },
 
   // Booking
   PENDING:     { label: 'Pending',     variant: 'warning' },

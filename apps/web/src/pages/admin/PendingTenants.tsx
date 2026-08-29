@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck } from 'lucide-react'
+import { BadgeCheck, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardTitle } from '@/components/ui/card'
@@ -12,6 +12,7 @@ import { PageLoader } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
 import { formatDateTime } from '@/lib/utils/format'
+import { cn } from '@/lib/utils/cn'
 
 const PENDING_TENANTS_KEY = ['admin', 'tenants', 'pending'] as const
 
@@ -22,7 +23,17 @@ type PendingTenant = {
   city: string | null
   profession: string | null
   createdAt: string
-  user: { email: string }
+  user: {
+    id: string
+    email: string
+    phone: string | null
+    status: string
+    rejectionCount: number
+    createdAt: string
+    rejections?: Array<{ id: string; reason: string; createdAt: string }>
+  }
+  isFlagged?: boolean
+  lastRejectionReason?: string | null
   documents: ReviewDocument[]
 }
 
@@ -92,7 +103,14 @@ function TenantReviewCard({ tenant }: { tenant: PendingTenant }) {
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <CardTitle>{tenant.fullName || '(name not set)'}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>{tenant.fullName || '(name not set)'}</CardTitle>
+            {tenant.isFlagged && (
+              <Badge variant="danger" className="text-xs">
+                ⚠️ Flagged ({tenant.user.rejectionCount} rejections)
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-gray-500">{tenant.user.email}</p>
           <p className="text-xs text-gray-400 mt-1">
             Joined {formatDateTime(tenant.createdAt)}
@@ -102,6 +120,29 @@ function TenantReviewCard({ tenant }: { tenant: PendingTenant }) {
         </div>
         <Badge variant="warning">Awaiting review</Badge>
       </div>
+
+      {tenant.user.rejectionCount > 0 && (
+        <div
+          className={cn(
+            'p-3 rounded-lg text-xs mt-3 flex items-start gap-2',
+            tenant.isFlagged
+              ? 'bg-red-50 text-red-900 border border-red-200'
+              : 'bg-amber-50 text-amber-900 border border-amber-200'
+          )}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+          <div>
+            <span className="font-semibold">
+              {tenant.user.rejectionCount} Previous Rejection(s)
+            </span>
+            {tenant.lastRejectionReason && (
+              <p className="mt-0.5 text-gray-700">
+                Latest Reason: &quot;{tenant.lastRejectionReason}&quot;
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-4">
         <p className="text-xs font-medium text-gray-500 mb-2">

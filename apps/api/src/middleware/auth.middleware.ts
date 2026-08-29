@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express'
 import { UserRole } from '@prisma/client'
 import { JWT } from '@config/constants'
 import { verifyAccessToken } from '@utils/jwt.util'
-import { UnauthorizedError } from '@utils/errors'
+import { UnauthorizedError, ForbiddenError } from '@utils/errors'
+import { prisma } from '@config/prisma'
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -12,11 +13,11 @@ type AuthenticatedRequest = Request & {
   }
 }
 
-export function authenticate(
+export async function authenticate(
   req: Request,
   _res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest
 
@@ -35,10 +36,36 @@ export function authenticate(
 
     const payload = verifyAccessToken(token)
 
+    // Verify user status in database for immediate lockout & tokenVersion validation
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId, deletedAt: null },
+      select: { id: true, role: true, email: true, status: true, tokenVersion: true },
+    })
+
+    if (!user) {
+      throw new UnauthorizedError('Account not found or has been removed.', 'USER_NOT_FOUND')
+    }
+
+    if (user.status === 'BLOCKED') {
+      throw new ForbiddenError('Your account has been blocked by an administrator.', 'ACCOUNT_BLOCKED')
+    }
+
+    if (user.status === 'SUSPENDED') {
+      throw new ForbiddenError('Your account is currently suspended.', 'ACCOUNT_SUSPENDED')
+    }
+
+    if (user.status === 'DEACTIVATED') {
+      throw new ForbiddenError('This account has been deactivated.', 'ACCOUNT_DEACTIVATED')
+    }
+
+    if (payload.tokenVersion !== undefined && payload.tokenVersion < user.tokenVersion) {
+      throw new UnauthorizedError('Session expired or revoked. Please log in again.', 'SESSION_REVOKED')
+    }
+
     authReq.user = {
-      userId: payload.userId,
-      role: payload.role,
-      email: payload.email,
+      userId: user.id,
+      role: user.role,
+      email: user.email,
     }
 
     next()
@@ -47,26 +74,40 @@ export function authenticate(
   }
 }
 
-export function optionalAuth(
+export async function optionalAuth(
   req: Request,
   _res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest
-    const token = req.cookies?.[JWT.ACCESS_COOKIE_NAME]
+    let token = req.cookies?.[JWT.ACCESS_COOKIE_NAME]
+
+    if (!token) {
+      const authHeader = req.headers.authorization
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7)
+      }
+    }
 
     if (token) {
       const payload = verifyAccessToken(token)
-      authReq.user = {
-        userId: payload.userId,
-        role: payload.role,
-        email: payload.email,
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId, status: 'ACTIVE', deletedAt: null },
+        select: { id: true, role: true, email: true },
+      })
+      if (user) {
+        authReq.user = {
+          userId: user.id,
+          role: user.role,
+          email: user.email,
+        }
       }
     }
   } catch {
-    // Silently ignore invalid tokens on optional auth routes and hi
+    // Silently ignore invalid tokens on optional auth routes
   }
   next()
 }
+
 

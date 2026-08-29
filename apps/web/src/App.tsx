@@ -49,6 +49,8 @@ import OwnerOnboarding from '@/pages/owner/Onboarding'
 
 // Admin
 import AdminLayout from '@/layouts/AdminLayout'
+import AdminUsers from '@/pages/admin/Users'
+import AdminUserDetail from '@/pages/admin/UserDetail'
 import AdminPendingOwners from '@/pages/admin/PendingOwners'
 import AdminPendingTenants from '@/pages/admin/PendingTenants'
 
@@ -107,7 +109,9 @@ export default function App() {
 
       {/* Admin — SUPER_ADMIN only. AdminLayout redirects everyone else. */}
       <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<Navigate to="owners" replace />} />
+        <Route index element={<Navigate to="users" replace />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="users/:userId" element={<AdminUserDetail />} />
         <Route path="owners" element={<AdminPendingOwners />} />
         <Route path="tenants" element={<AdminPendingTenants />} />
       </Route>
