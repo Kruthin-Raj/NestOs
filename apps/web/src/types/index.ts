@@ -19,15 +19,24 @@ export interface PaginatedData<T> {
 }
 
 export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'TENANT'
+export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED' | 'BLOCKED'
 
 export interface User {
   id: string
   email: string
+  phone?: string | null
   role: UserRole
+  status: UserStatus
+  statusReason?: string | null
+  statusUpdatedAt?: string | null
+  statusUpdatedBy?: string | null
+  rejectionCount: number
+  isFlagged?: boolean
   isEmailVerified: boolean
   isPhoneVerified: boolean
-  isActive: boolean
   lastLoginAt?: string
+  createdAt: string
+  updatedAt?: string
   ownerProfile?: {
     id: string
     fullName: string

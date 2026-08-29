@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { authenticate } from '@middleware/auth.middleware'
 import { isAdmin } from '@middleware/rbac.middleware'
@@ -12,13 +12,26 @@ import {
   getPendingTenantsService,
   verifyTenantIdService,
   rejectTenantIdService,
+  listUsersService,
+  getUserDetailService,
+  updateUserStatusService,
+  updateUserRoleService,
+  deleteUserService,
 } from './admin.service'
+import {
+  listUsersQuerySchema,
+  updateUserStatusSchema,
+  updateUserRoleSchema,
+} from './admin.validation'
 
 type OwnerProfileParams  = { ownerProfileId: string }
 type TenantProfileParams = { tenantProfileId: string }
+type UserParams          = { userId: string }
 
 export const adminRouter: ReturnType<typeof Router> = Router()
 adminRouter.use(authenticate, isAdmin)
+
+// ── Verification Queues ──────────────────────────────────────
 
 adminRouter.get('/owners/pending',
   asyncHandler(async (_req, res) => {
@@ -51,9 +64,6 @@ adminRouter.post('/owners/:ownerProfileId/reject',
   })
 )
 
-// ── Tenant identity verification ─────────────────────────────
-// isIdVerified gates booking and bed assignment; these are the only writes.
-
 adminRouter.get('/tenants/pending',
   asyncHandler(async (_req, res) => {
     const result = await getPendingTenantsService()
@@ -82,5 +92,53 @@ adminRouter.post('/tenants/:tenantProfileId/reject-id',
       req.body.reason
     )
     sendSuccess(res, 'Tenant identity rejected', result)
+  })
+)
+
+// ── User Management Endpoints ────────────────────────────────
+
+adminRouter.get('/users',
+  asyncHandler(async (req: Request, res: Response) => {
+    const validatedQuery = listUsersQuerySchema.parse(req.query)
+    const result = await listUsersService(validatedQuery)
+    sendSuccess(res, 'Users retrieved successfully', result)
+  })
+)
+
+adminRouter.get('/users/:userId',
+  asyncHandler<UserParams>(async (req, res) => {
+    const result = await getUserDetailService(req.params.userId)
+    sendSuccess(res, 'User details retrieved', result)
+  })
+)
+
+adminRouter.patch('/users/:userId/status',
+  validate(updateUserStatusSchema),
+  asyncHandler<UserParams>(async (req, res) => {
+    const result = await updateUserStatusService(
+      req.params.userId,
+      req.user!.userId,
+      req.body
+    )
+    sendSuccess(res, 'User status updated', result)
+  })
+)
+
+adminRouter.patch('/users/:userId/role',
+  validate(updateUserRoleSchema),
+  asyncHandler<UserParams>(async (req, res) => {
+    const result = await updateUserRoleService(
+      req.params.userId,
+      req.user!.userId,
+      req.body
+    )
+    sendSuccess(res, 'User role updated', result)
+  })
+)
+
+adminRouter.delete('/users/:userId',
+  asyncHandler<UserParams>(async (req, res) => {
+    const result = await deleteUserService(req.params.userId, req.user!.userId)
+    sendSuccess(res, 'User deleted successfully', result)
   })
 )

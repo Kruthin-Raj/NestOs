@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils/cn'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 const NAV_ITEMS = [
+  { href: '/admin/users',   label: 'Users' },
   { href: '/admin/owners',  label: 'Owner verification' },
   { href: '/admin/tenants', label: 'Tenant identity' },
 ]
