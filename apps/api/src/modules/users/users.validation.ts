@@ -2,12 +2,16 @@ import { z } from 'zod'
 import { optional, phoneNumber } from '@utils/zod.util'
 
 export const updateOwnerProfileSchema = z.object({
-  fullName:     optional(z.string().min(2).max(255).trim()),
-  businessName: optional(z.string().max(255).trim()),
-  phone:        optional(phoneNumber),
-  city:         optional(z.string().max(100).trim()),
-  state:        optional(z.string().max(100).trim()),
-  upiId:        optional(z.string().max(255).trim()),
+  fullName:          optional(z.string().min(2).max(255).trim()),
+  businessName:      optional(z.string().max(255).trim()),
+  phone:             optional(phoneNumber),
+  city:              optional(z.string().max(100).trim()),
+  state:             optional(z.string().max(100).trim()),
+  upiId:             optional(z.string().max(255).trim()),
+  bankName:          optional(z.string().max(255).trim()),
+  bankAccountName:   optional(z.string().max(255).trim()),
+  bankAccountNumber: optional(z.string().max(100).trim()),
+  bankIfscCode:      optional(z.string().max(100).trim()),
 }).refine(
   (data) => Object.values(data).some((v) => v !== undefined),
   { message: 'At least one field must be provided' }

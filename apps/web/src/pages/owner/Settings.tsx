@@ -14,12 +14,16 @@ import { CitySelect } from '@/components/ui/city-select'
 import { optionalPhone } from '@/lib/utils/phone'
 
 const schema = z.object({
-  fullName:     z.string().min(2, 'Enter your full name'),
-  businessName: z.string().optional(),
-  phone:        optionalPhone,
-  upiId:        z.string().optional(),
-  city:         z.string().optional(),
-  state:        z.string().optional(),
+  fullName:          z.string().min(2, 'Enter your full name'),
+  businessName:      z.string().optional(),
+  phone:             optionalPhone,
+  upiId:             z.string().optional(),
+  city:              z.string().optional(),
+  state:             z.string().optional(),
+  bankName:          z.string().optional(),
+  bankAccountName:   z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  bankIfscCode:      z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -36,12 +40,16 @@ export default function OwnerSettingsPage() {
     // render, which happens before the profile request resolves. That is why
     // saved details never appeared and had to be retyped every visit.
     values: {
-      fullName:     profile?.fullName     ?? '',
-      businessName: profile?.businessName ?? '',
-      phone:        full?.user?.phone     ?? '',
-      upiId:        profile?.upiId        ?? '',
-      city:         profile?.city         ?? '',
-      state:        profile?.state        ?? '',
+      fullName:          profile?.fullName          ?? '',
+      businessName:      profile?.businessName      ?? '',
+      phone:             full?.user?.phone          ?? '',
+      upiId:             profile?.upiId             ?? '',
+      city:              profile?.city              ?? '',
+      state:             profile?.state             ?? '',
+      bankName:          profile?.bankName          ?? '',
+      bankAccountName:   profile?.bankAccountName   ?? '',
+      bankAccountNumber: profile?.bankAccountNumber ?? '',
+      bankIfscCode:      profile?.bankIfscCode      ?? '',
     },
   })
 
@@ -74,61 +82,91 @@ export default function OwnerSettingsPage() {
         )}
       </Card>
 
-      {/* Profile form */}
-      <Card>
-        <CardTitle className="mb-4">Profile details</CardTitle>
-        <form onSubmit={handleSubmit((v) => mutate(v))} className="space-y-4">
-          <FormField label="Full name" error={errors.fullName?.message} required>
-            <Input {...register('fullName')} />
-          </FormField>
-          <FormField label="Business name">
-            <Input {...register('businessName')} placeholder="Optional" />
-          </FormField>
-          <FormField label="Mobile number" error={errors.phone?.message}>
-            <Controller
-              name="phone"
-              control={control}
-              render={({ field }) => (
-                <PhoneInput
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  error={errors.phone?.message}
-                />
-              )}
-            />
-          </FormField>
-          <FormField
-            label="UPI ID"
-            error={errors.upiId?.message}
-            hint="Required to collect rent — tenants pay this address directly"
-          >
-            <Input {...register('upiId')} placeholder="yourname@okhdfcbank" />
-          </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="City">
+      <form onSubmit={handleSubmit((v) => mutate(v))} className="space-y-6">
+        {/* Profile form */}
+        <Card>
+          <CardTitle className="mb-4">Profile details</CardTitle>
+          <div className="space-y-4">
+            <FormField label="Full name" error={errors.fullName?.message} required>
+              <Input {...register('fullName')} />
+            </FormField>
+            <FormField label="Business name">
+              <Input {...register('businessName')} placeholder="Optional" />
+            </FormField>
+            <FormField label="Mobile number" error={errors.phone?.message}>
               <Controller
-                name="city"
+                name="phone"
                 control={control}
                 render={({ field }) => (
-                  <CitySelect
-                    value={field.value ?? ''}
+                  <PhoneInput
+                    value={field.value}
                     onChange={field.onChange}
-                    onSelectState={(state) => setValue('state', state)}
-                    placeholder="Select city..."
+                    onBlur={field.onBlur}
+                    error={errors.phone?.message}
                   />
                 )}
               />
             </FormField>
-            <FormField label="State">
-              <Input {...register('state')} placeholder="Auto-filled" />
-            </FormField>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="City">
+                <Controller
+                  name="city"
+                  control={control}
+                  render={({ field }) => (
+                    <CitySelect
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onSelectState={(state) => setValue('state', state)}
+                      placeholder="Select city..."
+                    />
+                  )}
+                />
+              </FormField>
+              <FormField label="State">
+                <Input {...register('state')} placeholder="Auto-filled" />
+              </FormField>
+            </div>
           </div>
+        </Card>
+
+        {/* Payment options */}
+        {profile?.verificationStatus === 'VERIFIED' && (
+          <Card>
+            <CardTitle className="mb-4">Payment Methods</CardTitle>
+            <p className="text-sm text-gray-600 mb-4">Provide payment details to collect rent from tenants.</p>
+            <div className="space-y-4">
+              <FormField
+                label="UPI ID"
+                error={errors.upiId?.message}
+                hint="Tenants can pay to this UPI ID directly"
+              >
+                <Input {...register('upiId')} placeholder="yourname@okhdfcbank" />
+              </FormField>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Bank Name" error={errors.bankName?.message}>
+                  <Input {...register('bankName')} placeholder="e.g. HDFC Bank" />
+                </FormField>
+                <FormField label="Account Name" error={errors.bankAccountName?.message}>
+                  <Input {...register('bankAccountName')} placeholder="e.g. John Doe" />
+                </FormField>
+                <FormField label="Account Number" error={errors.bankAccountNumber?.message}>
+                  <Input {...register('bankAccountNumber')} placeholder="1234567890" />
+                </FormField>
+                <FormField label="IFSC Code" error={errors.bankIfscCode?.message}>
+                  <Input {...register('bankIfscCode')} placeholder="HDFC0001234" />
+                </FormField>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        <div className="flex justify-end">
           <Button type="submit" loading={isPending}>
             Save changes
           </Button>
-        </form>
-      </Card>
+        </div>
+      </form>
 
       {/* Account info */}
       <Card>

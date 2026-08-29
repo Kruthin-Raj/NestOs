@@ -43,6 +43,8 @@ export default function TenantPaymentsPage() {
     },
   })
 
+  const [paymentDetails, setPaymentDetails] = useState<any>(null)
+
   const { mutate: createOrder, isPending } = useMutation({
     mutationFn: async (bookingId: string) => {
       const now = new Date()
@@ -56,16 +58,10 @@ export default function TenantPaymentsPage() {
     },
     onSuccess: (orderData) => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.payments.my() })
+      setPaymentDetails(orderData)
 
-      // Try to open UPI app via intent link (works on mobile)
       if (orderData.upiIntentUrl) {
-        showToast(
-          `Pay ${formatRupees(orderData.amountRupees)} to ${orderData.payeeName} via your UPI app. UPI ID: ${orderData.payeeUpiId}`,
-          'info'
-        )
         window.location.href = orderData.upiIntentUrl
-      } else {
-        showToast('Owner has not set up UPI yet. Please contact them.', 'error')
       }
     },
     onError: (err: unknown) => {
@@ -108,7 +104,7 @@ export default function TenantPaymentsPage() {
         </Card>
       )}
 
-      {activeBooking && !depositOutstanding && (
+      {activeBooking && !depositOutstanding && !paymentDetails && (
         <Card>
           <CardTitle className="mb-1">Pay rent</CardTitle>
           <p className="text-sm text-gray-500 mb-3">
@@ -121,11 +117,47 @@ export default function TenantPaymentsPage() {
             onClick={() => createOrder(activeBooking.id)}
           >
             <Smartphone className="h-4 w-4 mr-1" />
-            Pay via UPI
+            Proceed to Pay
           </Button>
-          <p className="text-xs text-gray-400 mt-2">
-            After paying, enter the UPI reference (UTR) below so your owner can confirm it.
+        </Card>
+      )}
+
+      {paymentDetails && (
+        <Card>
+          <CardTitle className="mb-3 text-green-700">Payment Order Created</CardTitle>
+          <p className="text-sm text-gray-600 mb-4">Please pay {formatRupees(paymentDetails.amountRupees)} using one of the methods below:</p>
+          
+          <div className="space-y-4">
+            {paymentDetails.payeeUpiId && (
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <p className="text-sm font-medium text-gray-900 mb-1">UPI Transfer</p>
+                <p className="text-sm text-gray-600">UPI ID: <span className="font-mono">{paymentDetails.payeeUpiId}</span></p>
+                <p className="text-sm text-gray-600">Name: {paymentDetails.payeeName}</p>
+                {paymentDetails.upiIntentUrl && (
+                  <Button size="sm" variant="outline" className="mt-2" onClick={() => window.location.href = paymentDetails.upiIntentUrl}>
+                    Open UPI App
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {paymentDetails.bankDetails?.bankAccountNumber && (
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <p className="text-sm font-medium text-gray-900 mb-1">Bank Transfer</p>
+                <p className="text-sm text-gray-600">Bank: {paymentDetails.bankDetails.bankName}</p>
+                <p className="text-sm text-gray-600">Account Name: {paymentDetails.bankDetails.bankAccountName}</p>
+                <p className="text-sm text-gray-600">Account Number: <span className="font-mono">{paymentDetails.bankDetails.bankAccountNumber}</span></p>
+                <p className="text-sm text-gray-600">IFSC: <span className="font-mono">{paymentDetails.bankDetails.bankIfscCode}</span></p>
+              </div>
+            )}
+          </div>
+          
+          <p className="text-xs text-gray-500 mt-4">
+            After paying, scroll down and enter your transaction reference (UTR) below so the owner can confirm it.
           </p>
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => setPaymentDetails(null)}>
+            Dismiss
+          </Button>
         </Card>
       )}
 

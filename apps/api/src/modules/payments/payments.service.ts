@@ -63,18 +63,23 @@ export async function createPaymentOrderService(
       building: {
         select: {
           name: true, ownerId: true,
-          owner: { select: { id: true, fullName: true, upiId: true, businessName: true } },
+          owner: { select: { 
+            id: true, fullName: true, upiId: true, businessName: true,
+            bankName: true, bankAccountName: true, bankAccountNumber: true, bankIfscCode: true
+          } },
         },
       },
     },
   })
   if (!booking) throw new NotFoundError('Active booking not found')
 
-  const ownerUpiId = booking.building.owner.upiId
-  if (!ownerUpiId) {
+  const owner = booking.building.owner
+  const ownerUpiId = owner.upiId
+  const hasBankDetails = owner.bankAccountNumber && owner.bankIfscCode
+  if (!ownerUpiId && !hasBankDetails) {
     throw new BadRequestError(
-      'Property owner has not set up their UPI ID yet. Please contact them.',
-      'OWNER_UPI_NOT_SET'
+      'Property owner has not set up their payment details yet. Please contact them.',
+      'OWNER_PAYMENT_NOT_SET'
     )
   }
 
@@ -136,7 +141,7 @@ export async function createPaymentOrderService(
 
   const payeeName = booking.building.owner.businessName || booking.building.owner.fullName
   const upiIntentUrl = buildUpiIntentUrl({
-    payeeVpa:        ownerUpiId,
+    payeeVpa:        ownerUpiId || '',
     payeeName,
     amount:          amountRupees,
     transactionNote: `${booking.building.name} - ${description}`,
@@ -150,9 +155,15 @@ export async function createPaymentOrderService(
     billingMonth: dto.billingMonth,
     billingYear:  dto.billingYear,
     description,
-    upiIntentUrl,
+    upiIntentUrl: ownerUpiId ? upiIntentUrl : null,
     payeeUpiId:   ownerUpiId,
     payeeName,
+    bankDetails: {
+      bankName:          booking.building.owner.bankName,
+      bankAccountName:   booking.building.owner.bankAccountName,
+      bankAccountNumber: booking.building.owner.bankAccountNumber,
+      bankIfscCode:      booking.building.owner.bankIfscCode,
+    }
   }
 }
 

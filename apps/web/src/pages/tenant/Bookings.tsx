@@ -98,6 +98,8 @@ function ActiveBookingCard({ booking }: { booking: Booking }) {
 
   // Paying the deposit is what turns a PENDING booking into a confirmed
   // tenancy, so this is the main action while the booking is still pending.
+  const [paymentDetails, setPaymentDetails] = useState<any>(null)
+
   const { mutate: payDeposit, isPending: paying } = useMutation({
     mutationFn: async () => {
       const { data } = await apiClient.post('/payments/create-order', {
@@ -108,14 +110,9 @@ function ActiveBookingCard({ booking }: { booking: Booking }) {
     },
     onSuccess: (order) => {
       refresh()
+      setPaymentDetails(order)
       if (order.upiIntentUrl) {
-        showToast(
-          `Pay ${formatRupees(order.amountRupees)} to ${order.payeeName} via UPI (${order.payeeUpiId}), then submit the reference on the Payments page.`,
-          'info'
-        )
         window.location.href = order.upiIntentUrl
-      } else {
-        showToast('Owner has not set up UPI yet — contact them.', 'error')
       }
     },
     onError: onError('Could not start the deposit payment'),
@@ -170,7 +167,7 @@ function ActiveBookingCard({ booking }: { booking: Booking }) {
         ))}
       </div>
 
-      {isPendingBooking && !booking.depositPaid && (
+      {isPendingBooking && !booking.depositPaid && !paymentDetails && (
         <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3">
           <p className="text-sm text-amber-800">
             This booking is not confirmed yet. Pay the security deposit to confirm it —
@@ -178,7 +175,46 @@ function ActiveBookingCard({ booking }: { booking: Booking }) {
           </p>
           <Button size="sm" className="mt-2" loading={paying} onClick={() => payDeposit()}>
             <Smartphone className="h-4 w-4 mr-1" />
-            Pay deposit via UPI
+            Proceed to Pay Deposit
+          </Button>
+        </div>
+      )}
+
+      {paymentDetails && (
+        <div className="mt-4 rounded-lg bg-gray-50 border border-gray-200 p-4">
+          <p className="text-sm font-semibold text-gray-900 mb-2">Payment Order Created</p>
+          <p className="text-sm text-gray-600 mb-4">Please pay {formatRupees(paymentDetails.amountRupees)} using one of the methods below:</p>
+          
+          <div className="space-y-4">
+            {paymentDetails.payeeUpiId && (
+              <div className="p-3 bg-white rounded border border-gray-100 shadow-sm">
+                <p className="text-sm font-medium text-gray-900 mb-1">UPI Transfer</p>
+                <p className="text-sm text-gray-600">UPI ID: <span className="font-mono">{paymentDetails.payeeUpiId}</span></p>
+                <p className="text-sm text-gray-600">Name: {paymentDetails.payeeName}</p>
+                {paymentDetails.upiIntentUrl && (
+                  <Button size="sm" variant="outline" className="mt-2" onClick={() => window.location.href = paymentDetails.upiIntentUrl}>
+                    Open UPI App
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {paymentDetails.bankDetails?.bankAccountNumber && (
+              <div className="p-3 bg-white rounded border border-gray-100 shadow-sm">
+                <p className="text-sm font-medium text-gray-900 mb-1">Bank Transfer</p>
+                <p className="text-sm text-gray-600">Bank: {paymentDetails.bankDetails.bankName}</p>
+                <p className="text-sm text-gray-600">Account Name: {paymentDetails.bankDetails.bankAccountName}</p>
+                <p className="text-sm text-gray-600">Account Number: <span className="font-mono">{paymentDetails.bankDetails.bankAccountNumber}</span></p>
+                <p className="text-sm text-gray-600">IFSC: <span className="font-mono">{paymentDetails.bankDetails.bankIfscCode}</span></p>
+              </div>
+            )}
+          </div>
+          
+          <p className="text-xs text-gray-500 mt-4">
+            After paying, go to the <Link to="/tenant/payments" className="text-teal-600 hover:underline">Payments page</Link> and enter your transaction reference (UTR) so the owner can confirm it.
+          </p>
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => setPaymentDetails(null)}>
+            Dismiss
           </Button>
         </div>
       )}
