@@ -16,7 +16,7 @@
     "owner:create": "tsx prisma/create-owner.ts",
     "user:set-password": "tsx prisma/set-password.ts",
     "db:reset": "prisma migrate reset --force",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json"
   },
   "keywords": [],
   "author": "",

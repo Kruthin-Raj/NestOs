@@ -2,14 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
-  Users as UsersIcon,
   Search,
-  Filter,
-  Shield,
-  UserCheck,
   AlertTriangle,
-  MoreVertical,
-  Edit2,
   Trash2,
   CheckCircle,
   XCircle,
@@ -18,11 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   UserX,
-  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -31,6 +23,7 @@ import { EmptyState } from '@/components/feedback/empty-state'
 import { PageLoader } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
+import { apiErrorMessage } from '@/lib/utils/api-error'
 import { formatDateTime } from '@/lib/utils/format'
 import { cn } from '@/lib/utils/cn'
 import type { User, UserRole, UserStatus } from '@/types'
@@ -78,7 +71,7 @@ export default function AdminUsersPage() {
   const [forceRoleChange, setForceRoleChange] = useState(false)
 
   // Fetch Users
-  const { data, isLoading, isFetching } = useQuery<UsersApiResponse>({
+  const { data, isLoading } = useQuery<UsersApiResponse>({
     queryKey: [...USERS_QUERY_KEY, { page, limit, search, role: roleFilter, status: statusFilter, isFlagged: flaggedOnly }],
     queryFn: async () => {
       const params: Record<string, string | number | boolean> = { page, limit }
@@ -107,9 +100,8 @@ export default function AdminUsersPage() {
       setStatusModalOpen(false)
       setStatusReason('')
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || 'Failed to update user status'
-      showToast(msg, 'error')
+    onError: (err: unknown) => {
+      showToast(apiErrorMessage(err, 'Failed to update user status'), 'error')
     },
   })
 
@@ -129,9 +121,8 @@ export default function AdminUsersPage() {
       setRoleReason('')
       setForceRoleChange(false)
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || 'Failed to update user role'
-      showToast(msg, 'error')
+    onError: (err: unknown) => {
+      showToast(apiErrorMessage(err, 'Failed to update user role'), 'error')
     },
   })
 
@@ -145,9 +136,8 @@ export default function AdminUsersPage() {
       showToast('User account deactivated and credentials released', 'success')
       setDeleteModalOpen(false)
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || 'Failed to delete user'
-      showToast(msg, 'error')
+    onError: (err: unknown) => {
+      showToast(apiErrorMessage(err, 'Failed to delete user'), 'error')
     },
   })
 

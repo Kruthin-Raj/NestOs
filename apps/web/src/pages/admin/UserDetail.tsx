@@ -3,33 +3,20 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
-  Shield,
   AlertTriangle,
-  Clock,
-  FileText,
-  User as UserIcon,
-  Home,
-  CheckCircle,
   XCircle,
-  PauseCircle,
-  Ban,
   Trash2,
-  Edit,
-  History,
-  Building,
-  KeyRound,
-  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
 import { EmptyState } from '@/components/feedback/empty-state'
 import { DocumentRow } from '@/components/shared/document-row'
 import apiClient from '@/lib/api/client'
 import { showToast } from '@/components/ui/toaster'
+import { apiErrorMessage } from '@/lib/utils/api-error'
 import { formatDateTime } from '@/lib/utils/format'
 import { cn } from '@/lib/utils/cn'
 import type { User, UserRole, UserStatus } from '@/types'
@@ -107,7 +94,7 @@ interface UserDetailResponse {
   recentAuditLogs: Array<{
     id: string
     action: string
-    metadata: any
+    metadata: Record<string, unknown>
     createdAt: string
   }>
 }
@@ -154,8 +141,8 @@ export default function AdminUserDetailPage() {
       showToast('User status updated', 'success')
       setStatusModalOpen(false)
     },
-    onError: (err: any) => {
-      showToast(err?.response?.data?.message || 'Status update failed', 'error')
+    onError: (err: unknown) => {
+      showToast(apiErrorMessage(err, 'Status update failed'), 'error')
     },
   })
 
@@ -173,8 +160,8 @@ export default function AdminUserDetailPage() {
       showToast('User role updated', 'success')
       setRoleModalOpen(false)
     },
-    onError: (err: any) => {
-      showToast(err?.response?.data?.message || 'Role update failed', 'error')
+    onError: (err: unknown) => {
+      showToast(apiErrorMessage(err, 'Role update failed'), 'error')
     },
   })
 
@@ -187,8 +174,8 @@ export default function AdminUserDetailPage() {
       showToast('User deleted', 'success')
       navigate('/admin/users')
     },
-    onError: (err: any) => {
-      showToast(err?.response?.data?.message || 'Deletion failed', 'error')
+    onError: (err: unknown) => {
+      showToast(apiErrorMessage(err, 'Deletion failed'), 'error')
     },
   })
 
@@ -535,7 +522,7 @@ export default function AdminUserDetailPage() {
           ) : (
             <div className="space-y-2">
               {allDocs.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc as any} />
+                <DocumentRow key={doc.id} doc={doc} />
               ))}
             </div>
           )}

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, UserRole, OwnerVerificationStatus } from "@prisma/client";
+import { PrismaClient, UserRole, UserStatus, OwnerVerificationStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 /**
@@ -39,7 +39,8 @@ async function main() {
       data: {
         passwordHash: await bcrypt.hash(password, 10),
         isEmailVerified: true,
-        isActive: true,
+        status: UserStatus.ACTIVE,
+        statusReason: null,
       },
     });
     await prisma.ownerProfile.updateMany({
@@ -56,7 +57,7 @@ async function main() {
         role: UserRole.OWNER,
         passwordHash,
         isEmailVerified: true,
-        isActive: true,
+        status: UserStatus.ACTIVE,
         ownerProfile: {
           create: {
             fullName,
