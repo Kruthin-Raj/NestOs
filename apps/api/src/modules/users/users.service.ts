@@ -44,7 +44,7 @@ export function computeProfileCompletion(
 
 export async function getFullProfileService(userId: string, role: UserRole) {
   const user = await prisma.user.findFirst({
-    where: { id: userId, isActive: true, deletedAt: null },
+    where: { id: userId, status: 'ACTIVE', deletedAt: null },
     select: {
       id: true,
       email: true,

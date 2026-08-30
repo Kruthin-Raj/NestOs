@@ -12,7 +12,7 @@ import {
 } from '@utils/jwt.util'
 import {
   BadRequestError, UnauthorizedError,
-  NotFoundError, ConflictError
+  NotFoundError, ConflictError, ForbiddenError
 } from '@utils/errors'
 import {
   SendOtpDto, VerifyOtpDto, SignupDto, LoginDto,
@@ -142,7 +142,7 @@ export async function verifyOtpService(dto: VerifyOtpDto) {
   const { email, otp: code } = dto
 
   const user = await prisma.user.findUnique({ where: { email } })
-  if (!user || !user.isActive || user.deletedAt) {
+  if (!user || user.status !== 'ACTIVE' || user.deletedAt) {
     throw new UnauthorizedError(
       'No account found for this email. Please sign up first.',
       'ACCOUNT_NOT_FOUND'
@@ -168,7 +168,7 @@ export async function verifyOtpService(dto: VerifyOtpDto) {
 // ─────────────────────────────────────────────────────────────
 export async function getCurrentUserService(userId: string) {
   const user = await prisma.user.findUnique({
-    where: { id: userId, isActive: true, deletedAt: null },
+    where: { id: userId, status: 'ACTIVE', deletedAt: null },
     include: {
       ownerProfile: {
         select: {
@@ -236,8 +236,8 @@ export async function refreshTokensService(refreshTokenCookie: string | undefine
   }
 
   const user = await prisma.user.findUnique({
-    where:  { id: payload.userId, isActive: true, deletedAt: null },
-    select: { id: true, email: true, role: true, isEmailVerified: true },
+    where:  { id: payload.userId, status: 'ACTIVE', deletedAt: null },
+    select: { id: true, email: true, role: true, isEmailVerified: true, tokenVersion: true },
   })
 
   if (!user) {
@@ -265,9 +265,10 @@ export async function refreshTokensService(refreshTokenCookie: string | undefine
   ])
 
   const accessToken = signAccessToken({
-    userId: user.id,
-    role:   user.role,
-    email:  user.email,
+    userId:       user.id,
+    role:         user.role,
+    email:        user.email,
+    tokenVersion: user.tokenVersion,
   })
 
   const refreshToken = signRefreshToken({ userId: user.id, tokenId: newTokenId })
@@ -332,6 +333,7 @@ async function issueSession(user: {
   email: string
   role: UserRole
   isEmailVerified: boolean
+  tokenVersion?: number
 }) {
   const tokenId   = uuidv4()
   const tokenHash = await bcrypt.hash(tokenId, BCRYPT_ROUNDS)
@@ -351,7 +353,7 @@ async function issueSession(user: {
       role:            user.role,
       isEmailVerified: user.isEmailVerified,
     },
-    accessToken:  signAccessToken({ userId: user.id, role: user.role, email: user.email }),
+    accessToken:  signAccessToken({ userId: user.id, role: user.role, email: user.email, tokenVersion: user.tokenVersion }),
     refreshToken: signRefreshToken({ userId: user.id, tokenId }),
     expiresIn:    900,
   }
@@ -413,8 +415,15 @@ export async function loginService(dto: LoginDto) {
     new UnauthorizedError('Incorrect email or password.', 'INVALID_CREDENTIALS')
 
   if (!user || user.deletedAt) throw invalid()
-  if (!user.isActive) {
-    throw new UnauthorizedError('This account has been deactivated.', 'ACCOUNT_INACTIVE')
+
+  if (user.status === 'BLOCKED') {
+    throw new ForbiddenError('This account has been blocked by an administrator.', 'ACCOUNT_BLOCKED')
+  }
+  if (user.status === 'SUSPENDED') {
+    throw new ForbiddenError('This account is currently suspended.', 'ACCOUNT_SUSPENDED')
+  }
+  if (user.status === 'DEACTIVATED') {
+    throw new ForbiddenError('This account has been deactivated.', 'ACCOUNT_DEACTIVATED')
   }
 
   // Accounts that predate password login, including the seeded admin.
@@ -449,7 +458,7 @@ export async function loginService(dto: LoginDto) {
 export async function forgotPasswordService(dto: ForgotPasswordDto) {
   const user = await prisma.user.findUnique({ where: { email: dto.email } })
 
-  if (user && user.isActive && !user.deletedAt) {
+  if (user && user.status === 'ACTIVE' && !user.deletedAt) {
     try {
       await issueOtp(dto.email)
     } catch (err) {
@@ -473,7 +482,7 @@ export async function resetPasswordService(dto: ResetPasswordDto) {
   const { email, otp: code, password } = dto
 
   const user = await prisma.user.findUnique({ where: { email } })
-  if (!user || !user.isActive || user.deletedAt) {
+  if (!user || user.status !== 'ACTIVE' || user.deletedAt) {
     throw new UnauthorizedError('Invalid or expired code.', 'INVALID_OTP')
   }
 

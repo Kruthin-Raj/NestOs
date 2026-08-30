@@ -6,6 +6,7 @@ export interface JwtAccessPayload {
   userId: string
   role: 'SUPER_ADMIN' | 'OWNER' | 'TENANT'
   email: string
+  tokenVersion?: number
 }
 
 export interface JwtRefreshPayload {

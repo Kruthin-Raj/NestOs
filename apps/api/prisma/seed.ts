@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { PrismaClient, UserRole, UserStatus } from "@prisma/client";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -28,7 +28,7 @@ async function main() {
       email: ADMIN_EMAIL,
       role: UserRole.SUPER_ADMIN,
       isEmailVerified: true,
-      isActive: true,
+      status: UserStatus.ACTIVE,
     },
   });
 

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { PrismaClient, UserRole, UserStatus } from "@prisma/client";
 
 /**
  * Creates (or promotes) a SUPER_ADMIN.
@@ -37,12 +37,14 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where:  { email },
-    update: { isActive: true },
+    // Re-activating on re-run is deliberate: this is how you recover an admin
+    // that was suspended or blocked and locked everyone out of /admin.
+    update: { status: UserStatus.ACTIVE, statusReason: null },
     create: {
       email,
       role:            UserRole.SUPER_ADMIN,
       isEmailVerified: true,
-      isActive:        true,
+      status:          UserStatus.ACTIVE,
     },
   });
 

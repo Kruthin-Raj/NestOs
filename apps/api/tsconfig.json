@@ -21,6 +21,9 @@
       "@types/*": ["types/*"]
     }
   },
+  // prisma/ stays out of this config because rootDir is src/ and the build
+  // emits from it. The scripts in prisma/ are typechecked separately by
+  // tsconfig.scripts.json, which `pnpm lint` also runs.
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "prisma"],
   "ts-node": {

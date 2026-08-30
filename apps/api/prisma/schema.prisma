@@ -17,6 +17,18 @@ enum UserRole {
   TENANT
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+  BLOCKED
+}
+
+enum RejectionType {
+  OWNER_VERIFICATION
+  TENANT_IDENTITY
+}
+
 enum OwnerVerificationStatus {
   PENDING
   SUBMITTED
@@ -191,6 +203,13 @@ enum AuditAction {
   DOCUMENT_VERIFIED
   TENANT_MOVED_IN
   TENANT_MOVED_OUT
+  USER_STATUS_CHANGED
+  USER_ROLE_CHANGED
+  USER_BLOCKED
+  USER_UNBLOCKED
+  USER_SUSPENDED
+  USER_DEACTIVATED
+  USER_DELETED
 }
 
 // ============================================================
@@ -198,20 +217,22 @@ enum AuditAction {
 // ============================================================
 
 model User {
-  id              String    @id @default(uuid())
-  email           String    @unique
-  phone           String?   @unique
+  id              String         @id @default(uuid())
+  email           String         @unique
+  phone           String?        @unique
   role            UserRole
-  // Nullable on purpose: accounts created before password login existed have no
-  // password. Login detects that and sends them through the reset flow rather
-  // than failing, so no data migration is needed.
+  status          UserStatus     @default(ACTIVE)
+  statusReason    String?
+  statusUpdatedAt DateTime?
+  statusUpdatedBy String?
+  tokenVersion    Int            @default(1)
+  rejectionCount  Int            @default(0)
   passwordHash    String?
-  isEmailVerified Boolean   @default(false)
-  isPhoneVerified Boolean   @default(false)
-  isActive        Boolean   @default(true)
+  isEmailVerified Boolean        @default(false)
+  isPhoneVerified Boolean        @default(false)
   lastLoginAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   deletedAt       DateTime?
 
   // Relations
@@ -220,10 +241,27 @@ model User {
   refreshTokens   RefreshToken[]
   auditLogs       AuditLog[]
   issueComments   IssueComment[]
+  rejections      UserRejection[]
 
   @@index([email])
   @@index([role])
+  @@index([status])
   @@map("users")
+}
+
+model UserRejection {
+  id          String        @id @default(uuid())
+  userId      String
+  targetType  RejectionType
+  reason      String
+  adminId     String?
+  createdAt   DateTime      @default(now())
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("user_rejections")
 }
 
 model OtpCode {
