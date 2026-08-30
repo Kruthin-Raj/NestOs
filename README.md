@@ -349,7 +349,7 @@ for `{"status":"ok",...}`.
 | Command | App | What it does |
 |---|---|---|
 | `pnpm dev` | both | Dev server with reload |
-| `pnpm lint` | api | `tsc --noEmit` — type check |
+| `pnpm lint` | api | Type check of `src/` **and** `prisma/*.ts` |
 | `pnpm lint` | web | ESLint — must be 0 errors |
 | `pnpm build` | both | Type check + compile |
 | `pnpm db:studio` | api | Browse the database in a GUI |
@@ -489,6 +489,26 @@ signup and to authorise a password reset.
 | **Signup** | `/signup` — pick a role, set an email and password. The account is created unverified and a 6-digit code is emailed. Entering it confirms the address and signs you in. |
 | **Login** | `/login` — email and password. A wrong password and an unknown email give the same error, so the form cannot be used to discover which accounts exist. |
 | **Forgot password** | `/forgot-password` — a code is emailed, then you set a new password and are signed in. Every existing session is revoked. |
+
+### Account status
+
+Every user carries a `status`, which an admin sets from `/admin/users`:
+
+| Status | Effect |
+|---|---|
+| `ACTIVE` | Normal. |
+| `SUSPENDED` / `DEACTIVATED` / `BLOCKED` | Cannot log in, and any live session stops working **immediately**. |
+
+Immediately is the point. Each user has a `tokenVersion` stamped into their JWT and
+checked on every request; changing status increments it and revokes their refresh tokens,
+so a blocked account is out at once rather than when its access token happens to expire.
+The cost is a database read per authenticated request.
+
+`authenticate` returns `ACCOUNT_BLOCKED`, `ACCOUNT_SUSPENDED` or `ACCOUNT_DEACTIVATED` —
+distinguish these from an ordinary 401 when handling errors in the UI.
+
+Deleting a user is a soft delete: `deletedAt` is set and the email and phone are suffixed
+so the address can be registered again.
 
 **Accounts created before password login have no password.** `users.passwordHash` is
 nullable, so nothing needed migrating: logging in returns `PASSWORD_NOT_SET` and the UI
@@ -730,11 +750,9 @@ Actively under development. Check here before assuming something you wrote is br
 | 9 | No shared types package — `apps/web/src/types/index.ts` mirrors the Prisma schema by hand and will drift. |
 | 10 | No tests and no CI. `pnpm lint` and `pnpm build` are the only automated checks. |
 | 11 | `dashboardRouter` is mounted at both `/owner/dashboard` and `/tenant/dashboard` while defining `/owner` and `/tenant` paths, so the real URLs double up (`/owner/dashboard/owner`). It works and the frontend matches, but it reads oddly — this is the same shape that made notices 404 before it was fixed. |
-| 12 | The admin UI covers owner verification and tenant identity only. There is no user management, and a rejected owner or tenant can only resubmit by re-uploading documents. |
 | 13 | Payment confirmation is a manual trust step — see [Before you deploy](#before-you-deploy). |
 | 14 | Uploads live on local disk and do not survive a redeploy on an ephemeral filesystem — see [Before you deploy](#before-you-deploy). |
 | 15 | A building with no coordinates cannot appear in a nearby search. Older buildings predate the map picker. City search is unaffected. |
-| 16 | The database was built with `db:push`, which records no migration history, so `prisma migrate status` reports `init` as unapplied. Harmless now; the first `migrate deploy` will fail on tables that already exist. |
 | 17 | Contributors share one database, so a destructive command or a schema push affects everyone — see [Working as a team](#working-as-a-team). |
 
 ### Fixed
@@ -742,6 +760,12 @@ Actively under development. Check here before assuming something you wrote is br
 Issues 1–8 are resolved: notices routing, property search ordering, public property access
 for tenants, token refresh, file uploads, the unauthenticated document mount, the broken
 `pnpm start`, and the personal-Gmail `EMAIL_FROM` default. See `CLAUDE-FIX.md` for detail.
+
+Issue 12 (no user management) is resolved by the admin module — see
+[Account status](#account-status). Issue 16 (no migration history) is resolved:
+`prisma/migrations` is now the source of truth and `prisma migrate status` reports the
+database up to date. Prefer `pnpm db:migrate` over `pnpm db:push` from here on, so the
+history keeps matching the schema.
 
 ---
 
@@ -808,7 +832,10 @@ Share the connection string through a password manager, never a commit or a chat
 
 - Branch off `main`; never commit to `main` directly.
 - Run `pnpm lint` in **both** apps and `pnpm build` in `apps/web`. Zero lint errors.
-  Note that `apps/api`'s `lint` is `tsc --noEmit` — a type check, not ESLint.
+  Note that `apps/api`'s `lint` is a type check, not ESLint — and that it runs twice:
+  once for `src/`, once for the scripts in `prisma/` via `tsconfig.scripts.json`.
+  Do not drop the second one; while `prisma/` went unchecked, a schema change left
+  `db:seed`, `admin:create` and `owner:create` broken with every gate still green.
 - Keep commits scoped — one concern per commit, and make the message match what the
   commit actually changes.
 - Update this README when you change setup steps, conventions, or fix anything in
