@@ -207,32 +207,3 @@ export interface Notice {
   targetBuilding?: { name: string }
   createdAt: string
 }
-/**
- * What POST /payments/create-order returns.
- *
- * Both payment surfaces render this, so the shape lives here rather than being
- * re-declared — or typed `any`, which is how it started.
- *
- * `upiIntentUrl` is null when the owner has given bank details but no UPI ID:
- * there is nothing to deep-link into, and the tenant transfers manually
- * instead. At least one of the two is always present — the API refuses to
- * create an order otherwise.
- */
-export interface PaymentOrder {
-  paymentId:    string
-  amountRupees: number
-  currency:     string
-  type:         string
-  billingMonth: number
-  billingYear:  number
-  description:  string
-  upiIntentUrl: string | null
-  payeeUpiId:   string | null
-  payeeName:    string
-  bankDetails: {
-    bankName:          string | null
-    bankAccountName:   string | null
-    bankAccountNumber: string | null
-    bankIfscCode:      string | null
-  }
-}

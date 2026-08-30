@@ -1,0 +1,16 @@
+{
+  // Typecheck-only config for the standalone scripts in prisma/.
+  //
+  // They cannot live in tsconfig.json: its rootDir is src/ and the build emits
+  // from there. Left unchecked entirely, a schema change that replaced the
+  // User.isActive column broke db:seed, admin:create and owner:create while
+  // `pnpm lint` and `pnpm build` both stayed green — the failure only showed up
+  // when someone ran one of them. `pnpm lint` now runs this too.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["prisma/*.ts"],
+  "exclude": ["node_modules", "dist", "prisma/migrations"]
+}
