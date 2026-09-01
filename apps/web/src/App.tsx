@@ -52,7 +52,6 @@ import AdminLayout from '@/layouts/AdminLayout'
 import AdminUsers from '@/pages/admin/Users'
 import AdminUserDetail from '@/pages/admin/UserDetail'
 import AdminReports from '@/pages/admin/Reports'
-import AdminIssues from '@/pages/admin/Issues'
 import AdminPendingOwners from '@/pages/admin/PendingOwners'
 import AdminPendingTenants from '@/pages/admin/PendingTenants'
 
@@ -115,7 +114,6 @@ export default function App() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="users/:userId" element={<AdminUserDetail />} />
         <Route path="reports" element={<AdminReports />} />
-        <Route path="issues" element={<AdminIssues />} />
         <Route path="owners" element={<AdminPendingOwners />} />
         <Route path="tenants" element={<AdminPendingTenants />} />
       </Route>

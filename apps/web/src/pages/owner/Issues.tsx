@@ -58,7 +58,6 @@ export default function OwnerIssuesPage() {
             { value: '',            label: 'All statuses' },
             { value: 'OPEN',        label: 'Open' },
             { value: 'IN_PROGRESS', label: 'In progress' },
-            { value: 'PENDING_TENANT_VERIFICATION', label: 'Verifying' },
             { value: 'REOPENED',    label: 'Reopened' },
             { value: 'RESOLVED',    label: 'Resolved' },
             { value: 'REJECTED',    label: 'Rejected' },

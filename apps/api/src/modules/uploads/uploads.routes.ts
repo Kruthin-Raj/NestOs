@@ -116,8 +116,7 @@ uploadsRouter.get('/documents/:documentId',
     // responseType: 'blob' and renders a blob: URL, and XHR ignores
     // Content-Disposition entirely — this header only applies when the browser
     // navigates to the URL directly.
-    const disposition = req.query.inline === 'true' ? 'inline' : 'attachment'
-    res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(file.fileName)}"`)
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`)
     res.setHeader('Cache-Control', 'no-store, private')
 
     fs.createReadStream(file.absolutePath).pipe(res)

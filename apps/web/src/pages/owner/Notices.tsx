@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Bell, Trash2, AlertCircle, CheckCircle } from 'lucide-react'
+import { Plus, Bell, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -12,8 +12,6 @@ import { FormField } from '@/components/ui/form-field'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/shared/page-header'
-import { useOwnerDashboard } from '@/features/owner/dashboard/hooks/use-owner-dashboard'
-import { cn } from '@/lib/utils/cn'
 import { EmptyState } from '@/components/feedback/empty-state'
 import { PageLoader } from '@/components/feedback/loading-state'
 import apiClient from '@/lib/api/client'
@@ -53,20 +51,6 @@ export default function OwnerNoticesPage() {
       const { data } = await apiClient.get('/owner/notices')
       return data.data
     },
-  })
-
-  const { data: dashboardData, isLoading: isDashboardLoading } = useOwnerDashboard()
-  const alerts = dashboardData?.alerts ?? []
-
-  const { mutate: resolveAlert, isPending: isResolvingAlert } = useMutation({
-    mutationFn: async (id: string) => apiClient.patch(`/reports/owner/alerts/${id}/resolve`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard.owner() })
-      showToast('Alert marked as resolved', 'success')
-    },
-    onError: () => {
-      showToast('Failed to resolve alert', 'error')
-    }
   })
 
   const { mutate: createNotice, isPending } = useMutation({
@@ -154,41 +138,6 @@ export default function OwnerNoticesPage() {
           </Button>
         }
       />
-
-      {/* Critical Alerts */}
-      {alerts.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900 mb-2">Critical Alerts</h2>
-          {alerts.map((a: { id: string, message: string, reason?: string, createdAt: string, isResolved?: boolean }) => (
-            <Card key={a.id} className={cn("shadow-sm p-4", a.isResolved ? "border-amber-500 bg-amber-50" : "border-red-500 bg-red-50")}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertCircle className={cn("h-5 w-5", a.isResolved ? "text-amber-600" : "text-red-600")} />
-                    <h3 className={cn("text-sm font-bold", a.isResolved ? "text-amber-900" : "text-red-900")}>
-                      {a.isResolved ? 'Pending Admin Verification' : 'Action Required: Report Escalated by Admin'}
-                    </h3>
-                  </div>
-                  <p className={cn("text-sm font-medium mb-1", a.isResolved ? "text-amber-800" : "text-red-800")}>{a.message}</p>
-                  {a.reason && <p className={cn("text-xs italic", a.isResolved ? "text-amber-700" : "text-red-700")}>Original issue: "{a.reason}"</p>}
-                </div>
-                {!a.isResolved && (
-                  <Button 
-                    variant="danger" 
-                    size="sm" 
-                    onClick={() => resolveAlert(a.id)}
-                    disabled={isResolvingAlert}
-                    className="flex-shrink-0"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Mark Resolved
-                  </Button>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
 
       {showForm && (
         <Card>
@@ -295,15 +244,12 @@ export default function OwnerNoticesPage() {
                     )}
                   </div>
                 </div>
-                {!n.title.startsWith('Report Resolution') && !n.title.startsWith('Action Required:') && (
-                  <button
-                    onClick={() => deleteNotice(n.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded flex-shrink-0"
-                    title="Delete notice"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
+                <button
+                  onClick={() => deleteNotice(n.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded flex-shrink-0"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </Card>
           ))}

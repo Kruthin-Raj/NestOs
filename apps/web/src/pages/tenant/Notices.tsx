@@ -4,8 +4,6 @@ import { Bell } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { EmptyState } from '@/components/feedback/empty-state'
 import { PageLoader } from '@/components/feedback/loading-state'
-import { Button } from '@/components/ui/button'
-import { showToast } from '@/components/ui/toaster'
 import apiClient from '@/lib/api/client'
 import { QUERY_KEYS, NOTICE_CATEGORIES } from '@/lib/utils/constants'
 import { relativeTime } from '@/lib/utils/format'
@@ -50,19 +48,6 @@ export default function TenantNoticesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notices', 'unread'] })
     },
-  })
-
-  const { mutate: verifyReport, isPending: isVerifying } = useMutation({
-    mutationFn: async ({ id, accepted, reason }: { id: string, accepted: boolean, reason?: string }) => {
-      await apiClient.post(`/reports/escalated/${id}/verify`, { accepted, reason })
-    },
-    onSuccess: () => {
-      showToast('Verification submitted', 'success')
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.notices.tenant() })
-    },
-    onError: (err: unknown) => {
-      showToast(err instanceof Error ? err.message : 'Failed to submit verification', 'error')
-    }
   })
 
   const notices: Notice[] = data?.items ?? []
@@ -116,39 +101,7 @@ export default function TenantNoticesPage() {
                       {n.title}
                     </h3>
                   </div>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap mt-1">{n.body}</p>
-                  
-                  {/* Handle Verification UI */}
-                  {n.title === 'Report Resolution Verification' && n.body.includes('Escalation ID:') && (
-                    <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        disabled={isVerifying}
-                        onClick={() => {
-                          const escalationId = n.body.split('Escalation ID: ')[1]?.trim()
-                          if (escalationId) {
-                            verifyReport({ id: escalationId, accepted: true })
-                          }
-                        }}
-                      >
-                        Yes, Resolved
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={isVerifying}
-                        onClick={() => {
-                          const escalationId = n.body.split('Escalation ID: ')[1]?.trim()
-                          if (escalationId) {
-                            verifyReport({ id: escalationId, accepted: false })
-                          }
-                        }}
-                      >
-                        No, Not Resolved
-                      </Button>
-                    </div>
-                  )}
-
+                  <p className="text-sm text-gray-600 line-clamp-2">{n.body}</p>
                   <p className="text-xs text-gray-400 mt-2">{relativeTime(n.publishAt)}</p>
                 </div>
                 <span className={cn(

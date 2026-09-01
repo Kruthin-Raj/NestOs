@@ -44,7 +44,6 @@ const STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> = {
   // Issue
   OPEN:        { label: 'Open',        variant: 'warning' },
   IN_PROGRESS: { label: 'In Progress', variant: 'info' },
-  PENDING_TENANT_VERIFICATION: { label: 'Verifying', variant: 'purple' },
   RESOLVED:    { label: 'Resolved',    variant: 'success' },
   REJECTED:    { label: 'Rejected',    variant: 'danger' },
   REOPENED:    { label: 'Reopened',    variant: 'purple' },

@@ -299,27 +299,7 @@ export async function getDocumentFileService(
   // Admins review verification documents; everyone else sees only their own.
   const isSelf  = ownerUserId === viewerUserId
   const isAdmin = viewerRole === 'SUPER_ADMIN'
-  
-  let isEscalatedReportAttachment = false
-  if (!isSelf && !isAdmin && viewerRole === 'OWNER') {
-    const ownerProfile = await prisma.ownerProfile.findUnique({
-      where: { userId: viewerUserId },
-      select: { id: true }
-    })
-    if (ownerProfile) {
-      const linkedReport = await prisma.userReport.findFirst({
-        where: {
-          attachments: { has: documentId },
-          escalation: { ownerId: ownerProfile.id }
-        }
-      })
-      if (linkedReport) {
-        isEscalatedReportAttachment = true
-      }
-    }
-  }
-
-  if (!isSelf && !isAdmin && !isEscalatedReportAttachment) {
+  if (!isSelf && !isAdmin) {
     throw new ForbiddenError('You do not have permission to view this document')
   }
 
