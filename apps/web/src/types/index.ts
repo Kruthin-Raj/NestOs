@@ -64,7 +64,7 @@ export type BedStatus      = 'VACANT' | 'RESERVED' | 'OCCUPIED' | 'BLOCKED'
 export type BookingStatus  = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'FAILED'
 export type PaymentStatus  = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
 export type PaymentType    = 'BOOKING_DEPOSIT' | 'SECURITY_DEPOSIT' | 'RENT' | 'PENALTY'
-export type IssueStatus    = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED' | 'REOPENED'
+export type IssueStatus    = 'OPEN' | 'IN_PROGRESS' | 'PENDING_TENANT_VERIFICATION' | 'RESOLVED' | 'REJECTED' | 'REOPENED'
 export type IssuePriority  = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 
 export interface Building {

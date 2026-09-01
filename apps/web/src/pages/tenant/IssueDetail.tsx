@@ -49,11 +49,28 @@ export default function TenantIssueDetailPage() {
     },
   })
 
+  const { mutate: verifyResolution, isPending: verifying } = useMutation({
+    mutationFn: (data: { accepted: boolean; reason?: string }) =>
+      apiClient.post(`/issues/my/${issueId}/verify-resolution`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.issues.myDetail(issueId) })
+      showToast('Resolution verified', 'success')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      showToast(msg ?? 'Cannot verify resolution', 'error')
+    },
+  })
+
   const commentForm = useForm({
     resolver: zodResolver(z.object({ body: z.string().min(5) })),
   })
 
   const reopenForm = useForm({
+    resolver: zodResolver(z.object({ reason: z.string().min(10) })),
+  })
+
+  const rejectForm = useForm({
     resolver: zodResolver(z.object({ reason: z.string().min(10) })),
   })
 
@@ -105,7 +122,7 @@ export default function TenantIssueDetailPage() {
         ))}
 
         {/* Add comment (only if issue is open/in-progress/reopened) */}
-        {['OPEN', 'IN_PROGRESS', 'REOPENED', 'RESOLVED'].includes(issue.status) && (
+        {['OPEN', 'IN_PROGRESS', 'REOPENED'].includes(issue.status) && (
           <form
             onSubmit={commentForm.handleSubmit((v) => addComment(v.body))}
             className="mt-4 space-y-2"
@@ -121,6 +138,39 @@ export default function TenantIssueDetailPage() {
           </form>
         )}
       </Card>
+
+      {/* Pending Verification */}
+      {issue.status === 'PENDING_TENANT_VERIFICATION' && (
+        <Card>
+          <CardTitle className="mb-3 text-purple-700">Verification Required</CardTitle>
+          <p className="text-sm text-gray-700 mb-3">
+            The owner has marked this issue as resolved. Do you accept the resolution?
+          </p>
+          <div className="flex flex-col gap-4">
+            <Button
+              onClick={() => verifyResolution({ accepted: true })}
+              disabled={verifying}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              Yes, it is resolved
+            </Button>
+            <form
+              onSubmit={rejectForm.handleSubmit((v) => verifyResolution({ accepted: false, reason: v.reason }))}
+              className="space-y-2 pt-2 border-t"
+            >
+              <p className="text-sm font-medium">No, it is not resolved</p>
+              <Textarea
+                {...rejectForm.register('reason')}
+                rows={2}
+                placeholder="Explain why the issue is not resolved..."
+              />
+              <Button type="submit" variant="destructive" size="sm" loading={verifying}>
+                Reject Resolution
+              </Button>
+            </form>
+          </div>
+        </Card>
+      )}
 
       {/* Reopen */}
       {issue.canReopen && issue.status === 'RESOLVED' && (

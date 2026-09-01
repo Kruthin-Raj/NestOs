@@ -17,6 +17,7 @@ import {
   updateUserStatusService,
   updateUserRoleService,
   deleteUserService,
+  getAdminIssuesService,
 } from './admin.service'
 import {
   listUsersQuerySchema,
@@ -140,5 +141,14 @@ adminRouter.delete('/users/:userId',
   asyncHandler<UserParams>(async (req, res) => {
     const result = await deleteUserService(req.params.userId, req.user!.userId)
     sendSuccess(res, 'User deleted successfully', result)
+  })
+)
+
+// ── Issues ───────────────────────────────────────────────────
+
+adminRouter.get('/issues',
+  asyncHandler(async (_req, res) => {
+    const result = await getAdminIssuesService()
+    sendSuccess(res, 'Issues fetched', result)
   })
 )
