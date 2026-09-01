@@ -8,6 +8,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 const NAV_ITEMS = [
   { href: '/admin/users',   label: 'Users' },
   { href: '/admin/reports', label: 'Reports' },
+  { href: '/admin/issues',  label: 'Issues' },
   { href: '/admin/owners',  label: 'Owner verification' },
   { href: '/admin/tenants', label: 'Tenant identity' },
 ]

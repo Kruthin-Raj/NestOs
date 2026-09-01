@@ -117,6 +117,7 @@ enum IssuePriority {
 enum IssueStatus {
   OPEN
   IN_PROGRESS
+  PENDING_TENANT_VERIFICATION
   RESOLVED
   REJECTED
   REOPENED
@@ -280,11 +281,13 @@ model UserReport {
   reason         String       @db.VarChar(1000)
   status         ReportStatus @default(PENDING)
   adminNotes     String?
+  attachments    String[]     @default([])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   reporter       User         @relation("ReportedBy", fields: [reporterId], references: [id])
   reportedUser   User         @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  escalation     EscalatedReport?
 
   @@index([reporterId])
   @@index([reportedUserId])
@@ -350,6 +353,7 @@ model OwnerProfile {
   notices             Notice[]
   payments            Payment[]
   bookings            Booking[]
+  escalatedReports    EscalatedReport[]
 
   @@index([userId])
   @@index([verificationStatus])
@@ -738,6 +742,7 @@ model Issue {
   rejectionReason String?
   reopenedAt      DateTime?
   reopenDeadline  DateTime?
+  slaDeadline     DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
@@ -875,3 +880,31 @@ model VisitRequest {
   @@index([status])
   @@map("visit_requests")
 }
+
+// ============================================================
+// ESCALATED REPORTS
+// ============================================================
+
+model EscalatedReport {
+  id           String   @id @default(uuid())
+  reportId     String   @unique
+  ownerId      String
+  message      String   @db.VarChar(1000)
+  isResolved   Boolean  @default(false)
+  resolvedAt   DateTime?
+  ownerNote      String?
+  tenantVerified Boolean?  @default(false)
+  adminVerificationSentAt DateTime?
+  ownerDismissedAt        DateTime?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt    DateTime @updatedAt
+
+  report       UserReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  owner        OwnerProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  @@index([ownerId])
+  @@index([isResolved])
+  @@map("escalated_reports")
+}
+

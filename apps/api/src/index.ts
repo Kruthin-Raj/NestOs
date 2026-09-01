@@ -2,6 +2,7 @@ import { createApp } from './app'
 import { env, logConfig } from '@config/env'
 import { prisma, disconnectPrisma } from '@config/prisma'
 import { logger } from '@utils/logger'
+import { initIssueSlaCron } from './cron/issue-sla.cron'
 
 async function main(): Promise<void> {
   // ── 1. Validate environment ──────────────────────────────
@@ -26,6 +27,9 @@ async function main(): Promise<void> {
     logger.info(`Health check: http://localhost:${env.PORT}/health`, 'Server')
     logger.info(`Environment: ${env.NODE_ENV}`, 'Server')
   })
+
+  // ── 3.5 Initialize Background Jobs ───────────────────────
+  initIssueSlaCron()
 
   // ── 4. Graceful shutdown handlers ────────────────────────
   // These ensure in-flight requests finish before the server stops.

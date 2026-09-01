@@ -14,6 +14,7 @@ import {
   getOwnerIssuesService,
   updateIssueStatusService,
   addOwnerCommentService,
+  verifyIssueResolutionService,
 } from './issues.service'
 
 const commentSchema = z.object({
@@ -85,6 +86,22 @@ issuesRouter.post('/my/:issueId/reopen',
       req.body.reason
     )
     sendSuccess(res, 'Issue reopened', result)
+  })
+)
+
+issuesRouter.post('/my/:issueId/verify-resolution',
+  authenticate, isTenant,
+  validate(z.object({
+    accepted: z.boolean(),
+    reason:   z.string().max(500).optional(),
+  })),
+  asyncHandler<IssueParams>(async (req, res) => {
+    const result = await verifyIssueResolutionService(
+      req.params.issueId,
+      req.user!.userId,
+      req.body
+    )
+    sendSuccess(res, 'Issue resolution verified', result)
   })
 )
 

@@ -1,4 +1,4 @@
-import { Building2, CreditCard, AlertCircle, TrendingDown } from 'lucide-react'
+import { Building2, CreditCard, AlertCircle, TrendingDown, CheckCircle, X, Eye, Download } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageLoader } from '@/components/feedback/loading-state'
@@ -8,9 +8,33 @@ import { useOwnerDashboard } from '@/features/owner/dashboard/hooks/use-owner-da
 import { formatRupees, relativeTime } from '@/lib/utils/format'
 import { cn } from '@/lib/utils/cn'
 import { Link } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
+import apiClient from '@/lib/api/client'
+import { QUERY_KEYS } from '@/lib/utils/constants'
+import { showToast } from '@/components/ui/toaster'
 
 export default function OwnerDashboardPage() {
   const { data, isLoading } = useOwnerDashboard()
+  const qc = useQueryClient()
+
+  const { mutate: resolveAlert, isPending: isResolving } = useMutation({
+    mutationFn: async (id: string) => apiClient.patch(`/reports/owner/alerts/${id}/resolve`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard.owner() })
+      showToast('Alert marked as resolved', 'success')
+    },
+    onError: () => {
+      showToast('Failed to resolve alert', 'error')
+    }
+  })
+
+  const { mutate: dismissAlert, isPending: isDismissing } = useMutation({
+    mutationFn: async (id: string) => apiClient.patch(`/reports/owner/escalated/${id}/dismiss`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard.owner() })
+    }
+  })
 
   if (isLoading) return <PageLoader />
 
@@ -57,6 +81,90 @@ export default function OwnerDashboardPage() {
         title="Dashboard"
         description="Overview of your properties"
       />
+
+      {/* Critical Alerts */}
+      {d?.alerts?.length > 0 && (
+        <div className="space-y-3">
+          {d.alerts.map((a: { id: string, message: string, reason?: string, attachments?: string[], createdAt: string, isResolved?: boolean }) => (
+            <Card key={a.id} className={cn("shadow-sm p-4", a.isResolved ? "border-amber-500 bg-amber-50" : "border-red-500 bg-red-50")}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertCircle className={cn("h-5 w-5", a.isResolved ? "text-amber-600" : "text-red-600")} />
+                    <h3 className={cn("text-sm font-bold", a.isResolved ? "text-amber-900" : "text-red-900")}>
+                      {a.isResolved ? 'Pending Admin Verification' : 'Action Required: Report Escalated by Admin'}
+                    </h3>
+                  </div>
+                  <p className={cn("text-sm font-medium mb-1", a.isResolved ? "text-amber-800" : "text-red-800")}>{a.message}</p>
+                  {a.reason && <p className={cn("text-xs italic mb-2", a.isResolved ? "text-amber-700" : "text-red-700")}>Original issue: "{a.reason}"</p>}
+                  
+                  {a.attachments && a.attachments.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-3">
+                      <p className="text-xs font-semibold text-gray-500 uppercase">Attached Evidence</p>
+                      <div className="flex flex-wrap gap-3">
+                        {a.attachments.map((docId: string, i: number) => {
+                          const baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/uploads/documents/${docId}`
+                          const viewUrl = `${baseUrl}?inline=true`
+                          return (
+                            <div key={docId} className="flex items-center gap-3 bg-white p-2 pr-4 border border-gray-200 rounded-md shadow-sm w-max">
+                              <div className="h-10 w-10 relative rounded overflow-hidden bg-gray-100 border">
+                                <img 
+                                  src={viewUrl} 
+                                  alt={`Attachment ${i + 1}`} 
+                                  className="w-full h-full object-cover" 
+                                />
+                              </div>
+                              <a 
+                                href={viewUrl} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-sm font-medium text-primary hover:underline flex items-center gap-1.5"
+                              >
+                                <Eye className="w-4 h-4" /> View
+                              </a>
+                              <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                              <a 
+                                href={baseUrl} 
+                                download 
+                                className="text-gray-400 hover:text-gray-900 transition-colors"
+                                title="Download attachment"
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <button 
+                    onClick={() => dismissAlert(a.id)}
+                    disabled={isDismissing}
+                    className="text-gray-400 hover:text-gray-600 mb-1"
+                    title="Dismiss from dashboard"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  {!a.isResolved && (
+                    <Button 
+                      variant="danger" 
+                      size="sm" 
+                      onClick={() => resolveAlert(a.id)}
+                      disabled={isResolving}
+                      className="flex-shrink-0"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark Resolved
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

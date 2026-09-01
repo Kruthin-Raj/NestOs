@@ -26,7 +26,7 @@ export async function getOwnerDashboardService(
   const [
     occupancyStats, thisMonthPayments, lastMonthPayments,
     pendingPayments, recentPayments, issueStats,
-    recentIssues, activeNotices, recentActivity, buildingStats,
+    recentIssues, activeNotices, recentActivity, buildingStats, unresolvedAlerts,
   ] = await Promise.all([
     // Occupancy
     prisma.building.aggregate({
@@ -109,6 +109,19 @@ export async function getOwnerDashboardService(
       where: { id: { in: filteredIds }, deletedAt: null },
       select: { id: true, name: true, totalBeds: true, occupiedBeds: true },
     }),
+
+    // Escalated reports (alerts) where the parent report is not fully RESOLVED
+    prisma.escalatedReport.findMany({
+      where: { 
+        ownerId, 
+        report: { status: { not: 'RESOLVED' } },
+        ownerDismissedAt: null
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        report: { select: { reason: true, createdAt: true, status: true, attachments: true } },
+      }
+    }),
   ])
 
   const totalBeds    = Number(occupancyStats._sum.totalBeds ?? 0)
@@ -169,6 +182,14 @@ export async function getOwnerDashboardService(
       occupancyPercent: b.totalBeds > 0
         ? +((b.occupiedBeds / b.totalBeds) * 100).toFixed(1)
         : 0,
+    })),
+    alerts: unresolvedAlerts.map(a => ({
+      id: a.id,
+      message: a.message,
+      reason: a.report?.reason,
+      attachments: a.report?.attachments || [],
+      isResolved: a.isResolved,
+      createdAt: a.createdAt,
     })),
   }
 }

@@ -4,11 +4,12 @@ import { ISSUE } from '@config/constants'
 import { IssueStatus, IssuePriority, IssueCategory } from '@prisma/client'
 import { parsePagination } from '@utils/pagination.util'
 import { buildPaginationMeta } from '@utils/response.util'
+import { createNoticeService } from '../notices/notices.service'
 
 // Valid status transitions — owner can make these moves
 const OWNER_TRANSITIONS: Record<string, IssueStatus[]> = {
   OPEN:        ['IN_PROGRESS', 'REJECTED'],
-  IN_PROGRESS: ['RESOLVED', 'REJECTED'],
+  IN_PROGRESS: ['PENDING_TENANT_VERIFICATION', 'REJECTED'],
   REOPENED:    ['IN_PROGRESS'],
 }
 
@@ -248,41 +249,117 @@ export async function getOwnerIssuesService(ownerId: string, query: Record<strin
 
 export async function updateIssueStatusService(
   issueId: string, ownerId: string,
-  dto: { status: IssueStatus; note?: string; rejectionReason?: string }
+  dto: { status: IssueStatus | 'RESOLVED'; note?: string; rejectionReason?: string }
 ) {
+  // Overwrite 'RESOLVED' from owner side to 'PENDING_TENANT_VERIFICATION'
+  const requestedStatus = dto.status === 'RESOLVED' ? 'PENDING_TENANT_VERIFICATION' : dto.status
+
   const issue = await prisma.issue.findFirst({
     where: { id: issueId, ownerId, deletedAt: null },
   })
   if (!issue) throw new NotFoundError('Issue not found')
 
   const allowed = OWNER_TRANSITIONS[issue.status]
-  if (!allowed || !allowed.includes(dto.status)) {
+  if (!allowed || !allowed.includes(requestedStatus)) {
     throw new BadRequestError(
-      `Cannot transition from ${issue.status} to ${dto.status}`,
+      `Cannot transition from ${issue.status} to ${requestedStatus}`,
       'INVALID_STATUS_TRANSITION'
     )
   }
 
-  if (dto.status === 'REJECTED' && !dto.rejectionReason) {
+  if (requestedStatus === 'REJECTED' && !dto.rejectionReason) {
     throw new BadRequestError('Rejection reason is required', 'REJECTION_REASON_REQUIRED')
   }
 
   const now   = new Date()
-  const hours = ISSUE.REOPEN_WINDOW_HOURS
-  const reopenDeadline = dto.status === 'RESOLVED'
-    ? new Date(now.getTime() + hours * 3600 * 1000)
-    : undefined
+  let slaDeadline = issue.slaDeadline
+
+  if (requestedStatus === 'IN_PROGRESS' && issue.status !== 'IN_PROGRESS') {
+    // 14 days SLA starts when the owner begins work
+    slaDeadline = new Date(now.getTime() + 14 * 24 * 3600 * 1000)
+  }
 
   await prisma.issue.update({
     where: { id: issueId },
     data: {
-      status:          dto.status,
-      ...(dto.status === 'RESOLVED'  && { resolvedAt: now, reopenDeadline }),
-      ...(dto.status === 'REJECTED'  && { rejectedAt: now, rejectionReason: dto.rejectionReason }),
+      status:          requestedStatus as IssueStatus,
+      slaDeadline,
+      ...(requestedStatus === 'REJECTED'  && { rejectedAt: now, rejectionReason: dto.rejectionReason }),
     },
   })
 
-  return { status: dto.status, ...(reopenDeadline && { reopenDeadline }) }
+  // Send a notice to the tenant to verify the resolution
+  if (requestedStatus === 'PENDING_TENANT_VERIFICATION') {
+    await createNoticeService(ownerId, {
+      title: 'Issue Resolved - Please Verify',
+      body: `The owner has marked your issue "${issue.title}" as resolved. Please verify if the problem is fixed.`,
+      category: 'MAINTENANCE',
+      targetType: 'TENANT',
+      targetTenantId: issue.tenantId,
+      sendEmail: false
+    })
+  }
+
+  return { status: requestedStatus }
+}
+
+export async function verifyIssueResolutionService(
+  issueId: string, tenantUserId: string,
+  dto: { accepted: boolean; reason?: string }
+) {
+  const tenant = await prisma.tenantProfile.findUnique({
+    where: { userId: tenantUserId },
+    include: { user: { select: { id: true } } }
+  })
+  if (!tenant) throw new NotFoundError('Tenant profile not found')
+
+  const issue = await prisma.issue.findFirst({
+    where: { id: issueId, tenantId: tenant.id, deletedAt: null },
+  })
+  if (!issue) throw new NotFoundError('Issue not found')
+  if (issue.status !== 'PENDING_TENANT_VERIFICATION') {
+    throw new BadRequestError('Issue is not pending verification', 'NOT_PENDING_VERIFICATION')
+  }
+
+  const now = new Date()
+  
+  if (dto.accepted) {
+    const hours = ISSUE.REOPEN_WINDOW_HOURS
+    const reopenDeadline = new Date(now.getTime() + hours * 3600 * 1000)
+
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: { status: 'RESOLVED', resolvedAt: now, reopenDeadline }
+    })
+    return { status: 'RESOLVED', reopenDeadline }
+  } else {
+    // Rejected by tenant
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: { status: 'IN_PROGRESS' }
+    })
+
+    // Add comment indicating rejection
+    await prisma.issueComment.create({
+      data: {
+        issueId,
+        authorId: tenant.user.id,
+        authorRole: 'TENANT',
+        body: `Tenant rejected the resolution${dto.reason ? ': ' + dto.reason : '.'}`,
+      }
+    })
+
+    // Send a notice + email to the owner
+    await createNoticeService(issue.ownerId, {
+      title: 'Issue Resolution Rejected',
+      body: `The tenant ${tenant.fullName} has rejected the resolution for issue "${issue.title}". Reason: ${dto.reason || 'No reason provided.'}`,
+      category: 'MAINTENANCE',
+      targetType: 'ALL_BUILDINGS', // Since it's directed at the owner
+      sendEmail: true
+    })
+
+    return { status: 'IN_PROGRESS' }
+  }
 }
 
 export async function addOwnerCommentService(
