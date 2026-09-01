@@ -64,6 +64,7 @@ export const env = {
 
   // CORS
   FRONTEND_URL: optionalEnv('FRONTEND_URL', 'http://localhost:3000'),
+  CORS_ORIGIN: optionalEnv('CORS_ORIGIN', ''),
 } as const
 
 

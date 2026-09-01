@@ -1,6 +1,9 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
+const configuredUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
+export const API_URL = typeof window !== 'undefined' 
+  ? configuredUrl.replace(/(localhost|127\.0\.0\.1)/, window.location.hostname)
+  : configuredUrl
 
 const apiClient = axios.create({
   baseURL:         API_URL,
