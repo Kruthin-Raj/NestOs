@@ -43,6 +43,7 @@ export function createApp(): Application {
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
     'http://127.0.0.1:5173',
+    ...(env.CORS_ORIGIN ? env.CORS_ORIGIN.split(',').map(o => o.trim()) : [])
   ].filter(Boolean)
 
   app.use(cors({
