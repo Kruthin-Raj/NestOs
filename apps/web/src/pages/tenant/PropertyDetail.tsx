@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, MapPin, Phone, Users } from 'lucide-react'
+import { CalendarCheck, MapPin, Phone, Users, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +13,7 @@ import { formatRupees } from '@/lib/utils/format'
 import { showToast } from '@/components/ui/toaster'
 import { QUERY_KEYS } from '@/lib/utils/constants'
 import { cn } from '@/lib/utils/cn'
+import { ReportOwnerModal } from '@/components/ui/report-owner-modal'
 
 export default function PropertyDetailPage() {
   const buildingId = useRequiredParam('buildingId')
@@ -23,6 +24,8 @@ export default function PropertyDetailPage() {
   const [moveInDate, setMoveInDate] = useState('')
   const [visitAt, setVisitAt] = useState('')
   const [visitNote, setVisitNote] = useState('')
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [reportReason, setReportReason] = useState('')
   const queryClient = useQueryClient()
 
   const { data: property, isLoading } = useQuery({
@@ -104,12 +107,25 @@ export default function PropertyDetailPage() {
       {/* Header */}
       <div>
         <div className="flex items-start justify-between">
-          <h1 className="text-xl font-bold text-gray-900">{property.name}</h1>
-          <Badge variant="info">{property.type.replace('_', ' ')}</Badge>
-        </div>
-        <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
-          <MapPin className="h-4 w-4" />
-          <span>{property.addressLine1}, {property.city}</span>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-gray-900">{property.name}</h1>
+              <Badge variant="info">{property.type.replace('_', ' ')}</Badge>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
+              <MapPin className="h-4 w-4" />
+              <span>{property.addressLine1}, {property.city}</span>
+            </div>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={() => setIsReportModalOpen(true)}
+          >
+            <Flag className="h-4 w-4 mr-2" />
+            Report Owner
+          </Button>
         </div>
         {property.contactPhone && (
           <div className="flex items-center gap-1 text-sm text-gray-500 mt-0.5">
@@ -385,6 +401,14 @@ export default function PropertyDetailPage() {
             </button>
           </Card>
         </div>
+      )}
+
+      {property.ownerId && (
+        <ReportOwnerModal
+          ownerId={property.ownerId}
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+        />
       )}
     </div>
   )

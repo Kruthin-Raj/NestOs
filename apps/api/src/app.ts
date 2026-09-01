@@ -26,6 +26,7 @@ import { ownerNoticesRouter, tenantNoticesRouter } from '@modules/notices/notice
 import { ownerVisitsRouter, tenantVisitsRouter } from '@modules/visits/visits.routes'
 import { dashboardRouter } from '@modules/dashboard/dashboard.routes'
 import { adminRouter } from '@modules/admin/admin.routes'
+import { reportsRouter } from '@modules/reports/reports.routes'
 
 export function createApp(): Application {
   const app = express()
@@ -132,6 +133,7 @@ export function createApp(): Application {
   app.use(`${API_PREFIX}/owner/dashboard`,   dashboardRouter)
   app.use(`${API_PREFIX}/tenant/dashboard`,  dashboardRouter)
   app.use(`${API_PREFIX}/admin`,             adminRouter)
+  app.use(`${API_PREFIX}/reports`,           reportsRouter)
 
   // ── 404 and global error handler ─────────────────────────
   // These MUST be registered after all routes

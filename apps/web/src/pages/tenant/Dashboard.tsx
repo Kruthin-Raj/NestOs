@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertCircle, Bell, Search, MapPin,
-  ChevronRight, CheckCircle, Clock, XCircle,
+  ChevronRight, CheckCircle, Clock, XCircle, Flag
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
@@ -12,6 +12,8 @@ import apiClient from '@/lib/api/client'
 import { QUERY_KEYS } from '@/lib/utils/constants'
 import { formatRupees, formatDate, relativeTime } from '@/lib/utils/format'
 import { cn } from '@/lib/utils/cn'
+import { ReportOwnerModal } from '@/components/ui/report-owner-modal'
+import { useState } from 'react'
 
 export default function TenantDashboardPage() {
   const { data, isLoading } = useQuery({
@@ -125,6 +127,7 @@ function SearchingDashboard({ data }: { data: Record<string, unknown> }) {
 }
 
 function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   // Nested relations depend on what the endpoint includes, so they are optional
   // here — a missing one should degrade the text, not crash the page.
   const booking  = data.activeBooking as {
@@ -132,6 +135,7 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
     room?: { roomNumber?: string }
     bed?: { bedLabel?: string }
     moveInDate: string
+    ownerId?: string
   } | null
 
   const rent = data.rent as {
@@ -248,7 +252,20 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
       {/* Current residence info */}
       {booking && (
         <Card>
-          <CardTitle className="mb-3">My residence</CardTitle>
+          <div className="flex items-center justify-between mb-3">
+            <CardTitle>My residence</CardTitle>
+            {booking.ownerId && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8"
+                onClick={() => setIsReportModalOpen(true)}
+              >
+                <Flag className="h-3 w-3 mr-1.5" />
+                Report Owner
+              </Button>
+            )}
+          </div>
           <div className="space-y-2 text-sm text-gray-600">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-gray-400" />
@@ -290,6 +307,14 @@ function ActiveResidentDashboard({ data }: { data: Record<string, unknown> }) {
             </Link>
           ))}
         </Card>
+      )}
+
+      {booking?.ownerId && (
+        <ReportOwnerModal
+          ownerId={booking.ownerId}
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+        />
       )}
     </div>
   )

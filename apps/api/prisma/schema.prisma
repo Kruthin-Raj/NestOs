@@ -29,6 +29,13 @@ enum RejectionType {
   TENANT_IDENTITY
 }
 
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
 enum OwnerVerificationStatus {
   PENDING
   SUBMITTED
@@ -242,6 +249,8 @@ model User {
   auditLogs       AuditLog[]
   issueComments   IssueComment[]
   rejections      UserRejection[]
+  reportsSubmitted UserReport[] @relation("ReportedBy")
+  reportsReceived  UserReport[] @relation("ReportedUser")
 
   @@index([email])
   @@index([role])
@@ -262,6 +271,25 @@ model UserRejection {
   @@index([userId])
   @@index([createdAt])
   @@map("user_rejections")
+}
+
+model UserReport {
+  id             String       @id @default(uuid())
+  reporterId     String
+  reportedUserId String
+  reason         String       @db.VarChar(1000)
+  status         ReportStatus @default(PENDING)
+  adminNotes     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  reporter       User         @relation("ReportedBy", fields: [reporterId], references: [id])
+  reportedUser   User         @relation("ReportedUser", fields: [reportedUserId], references: [id])
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([status])
+  @@map("user_reports")
 }
 
 model OtpCode {
