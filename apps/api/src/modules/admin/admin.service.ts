@@ -403,6 +403,12 @@ export async function getUserDetailService(userId: string) {
       rejections: {
         orderBy: { createdAt: 'desc' },
       },
+      reportsReceived: {
+        orderBy: { createdAt: 'desc' },
+      },
+      reportsSubmitted: {
+        orderBy: { createdAt: 'desc' },
+      },
       auditLogs: {
         take: 15,
         orderBy: { createdAt: 'desc' },
@@ -434,6 +440,8 @@ export async function getUserDetailService(userId: string) {
     ownerProfile: user.ownerProfile,
     tenantProfile: user.tenantProfile,
     rejections: user.rejections,
+    reportsReceived: user.reportsReceived,
+    reportsSubmitted: user.reportsSubmitted,
     recentAuditLogs: user.auditLogs,
   }
 }

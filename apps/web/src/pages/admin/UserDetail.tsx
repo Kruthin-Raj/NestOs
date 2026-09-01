@@ -97,6 +97,20 @@ interface UserDetailResponse {
     metadata: Record<string, unknown>
     createdAt: string
   }>
+  reportsReceived: Array<{
+    id: string
+    reason: string
+    status: string
+    createdAt: string
+    reporter: { email: string }
+  }>
+  reportsSubmitted: Array<{
+    id: string
+    reason: string
+    status: string
+    createdAt: string
+    reportedUser: { email: string }
+  }>
 }
 
 export default function AdminUserDetailPage() {
@@ -105,7 +119,7 @@ export default function AdminUserDetailPage() {
   const qc = useQueryClient()
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'rejections' | 'audit' | 'documents'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'rejections' | 'audit' | 'documents' | 'reports'>('overview')
 
   // Status & Role Modals
   const [statusModalOpen, setStatusModalOpen] = useState(false)
@@ -189,9 +203,10 @@ export default function AdminUserDetailPage() {
     )
   }
 
-  const { user, ownerProfile, tenantProfile, rejections, recentAuditLogs } = data
+  const { user, ownerProfile, tenantProfile, rejections, recentAuditLogs, reportsReceived, reportsSubmitted } = data
   const displayName = ownerProfile?.fullName || tenantProfile?.fullName || user.email.split('@')[0]
   const allDocs = ownerProfile?.documents || tenantProfile?.documents || []
+  const allReports = [...(reportsReceived || []), ...(reportsSubmitted || [])]
 
   return (
     <div className="space-y-6">
@@ -379,6 +394,18 @@ export default function AdminUserDetailPage() {
         >
           Audit Log
         </button>
+
+        <button
+          onClick={() => setActiveTab('reports')}
+          className={cn(
+            'pb-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5',
+            activeTab === 'reports'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          )}
+        >
+          Reports ({allReports.length})
+        </button>
       </div>
 
       {/* Tab: Overview */}
@@ -551,6 +578,44 @@ export default function AdminUserDetailPage() {
                   </div>
                   <span className="text-xs text-gray-400 whitespace-nowrap">
                     {formatDateTime(log.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Tab: Reports */}
+      {activeTab === 'reports' && (
+        <Card className="p-5 space-y-4">
+          <CardTitle className="text-base">User Reports</CardTitle>
+          {allReports.length === 0 ? (
+            <p className="text-sm text-gray-500">No reports associated with this user.</p>
+          ) : (
+            <div className="divide-y divide-gray-200 dark:divide-gray-800">
+              {allReports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((report) => (
+                <div key={report.id} className="py-3 text-sm flex flex-col gap-1">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      {/* Check if reporter exists in the object, otherwise it means this user IS the reporter */}
+                      <span className="font-semibold text-gray-900">
+                        {'reporter' in report 
+                          ? `Reported by ${report.reporter.email}` 
+                          : `Reported against ${report.reportedUser.email}`}
+                      </span>
+                    </div>
+                    <Badge variant={
+                      report.status === 'PENDING' ? 'warning' :
+                      report.status === 'RESOLVED' ? 'success' :
+                      report.status === 'DISMISSED' ? 'default' : 'info'
+                    }>
+                      {report.status}
+                    </Badge>
+                  </div>
+                  <p className="text-gray-600 mt-1">{report.reason}</p>
+                  <span className="text-xs text-gray-400 mt-1">
+                    {formatDateTime(report.createdAt)}
                   </span>
                 </div>
               ))}
