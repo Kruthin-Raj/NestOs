@@ -46,6 +46,7 @@ import OwnerNotices from '@/pages/owner/Notices'
 import OwnerVisits from '@/pages/owner/Visits'
 import OwnerSettings from '@/pages/owner/Settings'
 import OwnerOnboarding from '@/pages/owner/Onboarding'
+import OwnerBuildingSetup from '@/pages/owner/BuildingSetup'
 
 // Admin
 import AdminLayout from '@/layouts/AdminLayout'
@@ -94,6 +95,7 @@ export default function App() {
         <Route path="dashboard" element={<OwnerDashboard />} />
         <Route path="buildings" element={<OwnerBuildings />} />
         <Route path="buildings/new" element={<OwnerBuildingNew />} />
+        <Route path="buildings/:buildingId/setup" element={<OwnerBuildingSetup />} />
         <Route path="buildings/:buildingId" element={<OwnerBuildingDetail />} />
         <Route path="buildings/:buildingId/edit" element={<OwnerBuildingEdit />} />
         <Route path="buildings/:buildingId/rooms" element={<OwnerRooms />} />

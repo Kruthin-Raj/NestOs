@@ -214,6 +214,44 @@ buildingsRouter.post('/',
   })
 )
 
+buildingsRouter.get('/photo',
+  asyncHandler(async (req, res) => {
+    const fileKey = req.query.fileKey as string
+    if (!fileKey) {
+      res.status(400).json({ success: false, message: 'File key required' })
+      return
+    }
+    const path = await import('path')
+    const { env } = await import('@config/env')
+    const fs = await import('fs')
+    
+    // Resolve full path and prevent directory traversal
+    const root = path.resolve(env.UPLOAD_DIR)
+    const fullPath = path.resolve(root, fileKey)
+    if (!fullPath.startsWith(root + path.sep)) {
+      res.status(400).json({ success: false, message: 'Invalid file key' })
+      return
+    }
+    
+    if (!fs.existsSync(fullPath)) {
+      res.status(404).json({ success: false, message: 'Photo not found' })
+      return
+    }
+    
+    // Serve the file (caching is fine for public building photos)
+    res.setHeader('Cache-Control', 'public, max-age=31536000')
+    const ext = path.extname(fullPath).toLowerCase()
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+    }
+    res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
+    fs.createReadStream(fullPath).pipe(res)
+  })
+)
+
 buildingsRouter.get('/:buildingId',
   asyncHandler<BuildingParams>(async (req, res) => {
     const building = await getBuildingService(
@@ -252,5 +290,25 @@ buildingsRouter.patch('/:buildingId/status',
       req.body.status
     )
     sendSuccess(res, result.message, { status: result.status })
+  })
+)
+
+buildingsRouter.post('/:buildingId/photos',
+  validate(z.object({
+    fileUrl: z.string().url().optional().or(z.literal('')),
+    fileKey: z.string().min(1),
+    caption: z.string().optional(),
+  })),
+  asyncHandler<BuildingParams>(async (req, res) => {
+    const { addBuildingPhotoService } = await import('./photos.service')
+    const result = await addBuildingPhotoService(
+      req.params.buildingId,
+      req.resourceOwnerId!,
+      {
+        ...req.body,
+        fileUrl: req.body.fileUrl || `/api/v1/buildings/photo?fileKey=${req.body.fileKey}`
+      }
+    )
+    sendCreated(res, 'Building photo added', result)
   })
 )

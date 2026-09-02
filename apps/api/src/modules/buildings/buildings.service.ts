@@ -535,7 +535,7 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
         },
         photos: {
           orderBy: { sortOrder: 'asc' },
-          take: 1,
+          take: 5,
           select: { fileUrl: true },
         },
         beds: {
@@ -571,6 +571,7 @@ export async function searchPropertiesService(query: Record<string, unknown>) {
         vacantBeds: b.beds.length,
         amenities: b.amenities.map((a) => a.name),
         coverPhoto: b.photos[0]?.fileUrl ?? null,
+        photos: b.photos.map(p => p.fileUrl),
         distanceKm:
           nearby && b.latitude !== null && b.longitude !== null
             ? Math.round(

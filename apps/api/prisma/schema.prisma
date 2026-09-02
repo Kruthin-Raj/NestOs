@@ -170,6 +170,8 @@ enum DocumentType {
   PROPERTY_TAX
   SELFIE
   OTHER
+  BUILDING_PHOTO
+  ROOM_PHOTO
 }
 
 enum DocumentStatus {
@@ -585,6 +587,7 @@ model Room {
   floor         Floor     @relation(fields: [floorId], references: [id], onDelete: Cascade)
   building      Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   amenities     RoomAmenity[]
+  photos        RoomPhoto[]
   beds          Bed[]
   issues        Issue[]
   notices       Notice[]
@@ -604,6 +607,21 @@ model RoomAmenity {
 
   @@index([roomId])
   @@map("room_amenities")
+}
+
+model RoomPhoto {
+  id          String   @id @default(uuid())
+  roomId      String
+  fileUrl     String
+  fileKey     String
+  caption     String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_photos")
 }
 
 model Bed {

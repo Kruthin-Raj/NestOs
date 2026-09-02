@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { MapPin, LocateFixed, X } from 'lucide-react'
+import { MapPin, LocateFixed, X, Map as MapIcon, List } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { CitySelect } from '@/components/ui/city-select'
 import { Select } from '@/components/ui/select'
@@ -15,6 +15,8 @@ import apiClient from '@/lib/api/client'
 import { formatRupees } from '@/lib/utils/format'
 import { QUERY_KEYS } from '@/lib/utils/constants'
 import { showToast } from '@/components/ui/toaster'
+import { PropertyMap, MapProperty } from './PropertyMap'
+import { PropertyCard } from './PropertyCard'
 
 interface SearchFilters {
   city:             string
@@ -36,14 +38,13 @@ export default function SearchPage() {
   })
   const [applied, setApplied] = useState<SearchFilters>(filters)
   const [locating, setLocating] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const [activePropertyId, setActivePropertyId] = useState<string | null>(null)
 
   const usingLocation = Boolean(applied.lat && applied.lng)
 
   /**
    * Asks the browser for a fix and searches from it.
-   *
-   * Requires HTTPS in production; localhost is exempt. Denial is a normal
-   * outcome, not an error — fall back to searching by city.
    */
   function searchNearMe() {
     if (!navigator.geolocation) {
@@ -63,6 +64,7 @@ export default function SearchPage() {
         setFilters(next)
         setApplied(next)
         setLocating(false)
+        setViewMode('map') // Automatically switch to map view on "near me"
       },
       () => {
         showToast('Could not get your location. Allow access, or search by city.', 'error')
@@ -90,14 +92,46 @@ export default function SearchPage() {
   })
 
   const properties = data?.items ?? []
+  
+  // Format for the map
+  const mapProperties: MapProperty[] = properties.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    minRent: p.minRent,
+    coverPhoto: p.coverPhoto,
+  }))
+
+  const mapCenter: [number, number] | undefined = applied.lat && applied.lng 
+    ? [Number(applied.lat), Number(applied.lng)] 
+    : undefined
 
   return (
-    <div className="space-y-4">
-      <PageHeader title="Find a PG" description="Search available PGs and hostels near you" />
+    <div className="flex flex-col h-[calc(100vh-6rem)]">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <PageHeader title="Find a PG" description="Search available PGs and hostels near you" />
+        
+        {/* Mobile View Toggle */}
+        <div className="lg:hidden flex bg-gray-100 p-1 rounded-lg">
+          <button 
+            className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4" /> List
+          </button>
+          <button 
+            className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'map' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            onClick={() => setViewMode('map')}
+          >
+            <MapIcon className="h-4 w-4" /> Map
+          </button>
+        </div>
+      </div>
 
       {/* Search bar */}
-      <Card>
-        <div className="flex gap-3">
+      <Card className="mb-4 flex-shrink-0 z-10">
+        <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1">
             <CitySelect
               value={filters.city}
@@ -105,11 +139,13 @@ export default function SearchPage() {
               placeholder="Search by city..."
             />
           </div>
-          <Button onClick={() => setApplied({ ...filters })}>Search</Button>
-          <Button variant="outline" loading={locating} onClick={searchNearMe}>
-            <LocateFixed className="h-4 w-4 mr-1" />
-            Near me
-          </Button>
+          <div className="flex gap-2">
+            <Button className="flex-1 md:flex-none" onClick={() => setApplied({ ...filters })}>Search</Button>
+            <Button className="flex-1 md:flex-none" variant="outline" loading={locating} onClick={searchNearMe}>
+              <LocateFixed className="h-4 w-4 mr-1" />
+              Near me
+            </Button>
+          </div>
         </div>
 
         {usingLocation && (
@@ -167,94 +203,68 @@ export default function SearchPage() {
         </div>
       </Card>
 
-      {/* Results */}
-      {isLoading ? (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
-        </div>
-      ) : !properties.length ? (
-        <EmptyState
-          icon={<MapPin className="h-12 w-12" />}
-          title="No properties found"
-          description={
-            usingLocation
-              ? 'Nothing listed within that distance. Try a larger radius, or search by city.'
-              : 'Try a different city or adjust your filters'
-          }
-        />
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {properties.map((p: {
-            id: string; name: string; type: string; genderPreference: string
-            city: string; addressLine1: string; landmark?: string
-            minRent: number | null; maxRent: number | null
-            vacantBeds: number; amenities: string[]; coverPhoto: string | null
-            distanceKm: number | null
-          }) => (
-            <Link key={p.id} to={`/tenant/property/${p.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer p-0 overflow-hidden h-full">
-                {p.coverPhoto && (
-                  <img
-                    src={p.coverPhoto}
-                    alt={p.name}
-                    className="w-full h-40 object-cover"
-                  />
-                )}
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="font-semibold text-gray-900">{p.name}</h3>
-                    <Badge variant={p.vacantBeds > 0 ? 'success' : 'default'}>
-                      {p.vacantBeds > 0 ? `${p.vacantBeds} vacant` : 'Full'}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                    <MapPin className="h-3 w-3" />
-                    <span>{p.addressLine1}, {p.city}</span>
-                    {p.distanceKm !== null && (
-                      <span className="ml-auto font-medium text-teal-700">
-                        {p.distanceKm < 1
-                          ? `${Math.round(p.distanceKm * 1000)} m away`
-                          : `${p.distanceKm} km away`}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="info">{p.type.replace('_', ' ')}</Badge>
-                    <Badge variant="default">{p.genderPreference.replace('_', ' ')}</Badge>
-                  </div>
-
-                  {p.amenities.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {p.amenities.slice(0, 3).map((a) => (
-                        <span key={a} className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                          {a}
-                        </span>
-                      ))}
-                      {p.amenities.length > 3 && (
-                        <span className="text-xs text-gray-400">+{p.amenities.length - 3}</span>
-                      )}
-                    </div>
-                  )}
-
-                  <p className="text-base font-bold text-indigo-600">
-                    {p.minRent ? (
-                      <>
-                        {formatRupees(p.minRent)}
-                        {p.maxRent && p.maxRent !== p.minRent && ` – ${formatRupees(p.maxRent)}`}
-                        <span className="text-xs font-normal text-gray-500">/month</span>
-                      </>
-                    ) : (
-                      'Contact for price'
-                    )}
-                  </p>
+      {/* Main Content Area: Split View on Large Screens */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 relative">
+        
+        {/* List View */}
+        <div className={`flex-1 overflow-y-auto lg:w-1/2 pr-2 ${viewMode === 'map' ? 'hidden lg:block' : 'block'}`}>
+          {/* Categories / Filters */}
+          <div className="flex items-center gap-4 overflow-x-auto pb-4 mb-4 border-b border-gray-100 no-scrollbar whitespace-nowrap">
+            {['Rooms', 'Apartments', 'Villas', 'Trending', 'New', 'Guest Favourites'].map((cat, i) => (
+              <button
+                key={cat}
+                className={`flex flex-col items-center gap-1.5 min-w-[70px] transition-opacity hover:opacity-100 ${
+                  i === 0 ? 'opacity-100 border-b-2 border-black pb-1' : 'opacity-60 hover:border-b-2 hover:border-gray-300 pb-1'
+                }`}
+              >
+                {/* Mock Icons for aesthetics */}
+                <div className="text-gray-900 font-medium text-sm">
+                  {cat}
                 </div>
-              </Card>
-            </Link>
-          ))}
+              </button>
+            ))}
+          </div>
+
+          {isLoading ? (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+            </div>
+          ) : !properties.length ? (
+            <EmptyState
+              icon={<MapPin className="h-12 w-12" />}
+              title="No properties found"
+              description={
+                usingLocation
+                  ? 'Nothing listed within that distance. Try a larger radius, or search by city.'
+                  : 'Try a different city or adjust your filters'
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10 pb-10">
+              {properties.map((p: any) => (
+                <div 
+                  key={p.id}
+                  onMouseEnter={() => setActivePropertyId(p.id)}
+                  onMouseLeave={() => setActivePropertyId(null)}
+                >
+                  <PropertyCard property={p} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Map View */}
+        <div className={`flex-1 h-[400px] lg:h-auto lg:w-1/2 lg:sticky lg:top-0 ${viewMode === 'list' ? 'hidden lg:block' : 'block'}`}>
+          <PropertyMap 
+            properties={mapProperties} 
+            center={mapCenter}
+            activePropertyId={activePropertyId}
+            onMarkerClick={(id) => setActivePropertyId(id)}
+          />
+        </div>
+        
+      </div>
     </div>
   )
 }
