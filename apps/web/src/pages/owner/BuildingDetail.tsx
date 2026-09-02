@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import {
   MapPin, Plus,
-  Settings, ToggleLeft, ToggleRight, ChevronRight,
+  Settings, ToggleLeft, ToggleRight, ChevronRight, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -17,6 +18,10 @@ import {
 import { formatRupees } from '@/lib/utils/format'
 import type { Floor } from '@/types'
 import { ReadOnlyMap } from '@/components/ui/read-only-map'
+import { useQueryClient } from '@tanstack/react-query'
+import { QUERY_KEYS } from '@/lib/utils/constants'
+import { showToast } from '@/components/ui/toaster'
+import apiClient from '@/lib/api/client'
 
 export default function BuildingDetailPage() {
   const buildingId      = useRequiredParam('buildingId')
@@ -108,6 +113,12 @@ export default function BuildingDetailPage() {
         </Card>
       )}
 
+      {/* Photos Section */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-gray-900">Photos</h2>
+      </div>
+      <BuildingPhotosGallery buildingId={buildingId} photos={building.photos || []} />
+
       {/* Floors / rooms section */}
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-gray-900">Floors & Rooms</h2>
@@ -164,6 +175,72 @@ function FloorCard({ floor, buildingId }: { floor: Floor; buildingId: string }) 
           <ChevronRight className="h-4 w-4 text-gray-400" />
         </Link>
       ))}
+    </Card>
+  )
+}
+
+function BuildingPhotosGallery({ buildingId, photos }: { buildingId: string; photos: any[] }) {
+  const [isUploading, setIsUploading] = useState(false)
+  const qc = useQueryClient()
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      const presignedRes = await apiClient.post('/uploads/presigned-url', {
+        documentType: 'BUILDING_PHOTO',
+        fileName: file.name,
+        mimeType: file.type,
+        fileSizeBytes: file.size,
+      })
+      
+      const { uploadUrl, fileKey } = presignedRes.data.data
+
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      })
+
+      await apiClient.post(`/buildings/${buildingId}/photos`, {
+        fileKey: fileKey,
+        caption: 'Building Photo'
+      })
+      
+      showToast('Photo uploaded successfully', 'success')
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.detail(buildingId) })
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to upload photo'
+      showToast(msg, 'error')
+    } finally {
+      setIsUploading(false)
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {photos.map((p, i) => (
+          <div key={i} className="aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
+            <img src={p.fileUrl} alt="Property" className="w-full h-full object-cover" />
+          </div>
+        ))}
+        
+        <label className="aspect-square bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+          {isUploading ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <>
+              <Plus className="w-6 h-6 mb-2" />
+              <span className="text-sm font-medium">Add Photo</span>
+              <input type="file" accept="image/jpeg, image/png, image/webp" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+            </>
+          )}
+        </label>
+      </div>
     </Card>
   )
 }

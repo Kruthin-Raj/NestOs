@@ -87,7 +87,7 @@ export default function NewBuildingPage() {
       { ...values, amenities: selectedAmenities, ...(location ?? {}) },
       {
         onSuccess: (data) => {
-          navigate(`/owner/buildings/${data.id}`)
+          navigate(`/owner/buildings/${data.id}/setup`)
         },
       }
     )

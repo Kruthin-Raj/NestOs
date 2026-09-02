@@ -16,7 +16,7 @@ import {
 const documentTypeEnum = z.enum([
   'AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN_CARD', 'PASSPORT', 'DRIVING_LICENCE',
   'VOTER_ID', 'PROPERTY_DEED', 'LEASE_AGREEMENT', 'UTILITY_BILL',
-  'PROPERTY_TAX', 'SELFIE', 'OTHER',
+  'PROPERTY_TAX', 'SELFIE', 'OTHER', 'BUILDING_PHOTO', 'ROOM_PHOTO'
 ])
 
 const presignedUrlSchema = z.object({

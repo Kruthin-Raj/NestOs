@@ -104,3 +104,24 @@ roomsRouter.delete('/:buildingId/rooms/:roomId',
     sendNoContent(res)
   })
 )
+
+roomsRouter.post('/:buildingId/rooms/:roomId/photos',
+  validate(z.object({
+    fileUrl: z.string().url().optional().or(z.literal('')),
+    fileKey: z.string().min(1),
+    caption: z.string().optional(),
+  })),
+  asyncHandler<RoomParams>(async (req, res) => {
+    const { addRoomPhotoService } = await import('../buildings/photos.service')
+    const result = await addRoomPhotoService(
+      req.params.buildingId,
+      req.params.roomId,
+      req.resourceOwnerId!,
+      {
+        ...req.body,
+        fileUrl: req.body.fileUrl || `/api/v1/buildings/photo?fileKey=${req.body.fileKey}`
+      }
+    )
+    sendCreated(res, 'Room photo added', result)
+  })
+)

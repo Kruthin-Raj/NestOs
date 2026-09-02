@@ -89,15 +89,31 @@ export async function createRoomService(
   if (!floor) throw new NotFoundError('Floor not found in this building')
 
   const { amenities, ...roomData } = dto
-  return prisma.room.create({
-    data: {
-      ...roomData,
-      buildingId,
-      amenities: amenities
-        ? { create: amenities.map((name) => ({ name })) }
-        : undefined,
-    },
-    select: { id: true, roomNumber: true },
+  return prisma.$transaction(async (tx) => {
+    const room = await tx.room.create({
+      data: {
+        ...roomData,
+        buildingId,
+        amenities: amenities
+          ? { create: amenities.map((name) => ({ name })) }
+          : undefined,
+        beds: {
+          create: Array.from({ length: dto.capacity }).map((_, i) => ({
+            buildingId, // Need to set buildingId as it's required by Bed schema
+            bedLabel: dto.type === 'PRIVATE' ? `Single Bed` : `Bed ${i + 1}`,
+            monthlyRent: dto.baseRent,
+          }))
+        }
+      },
+      select: { id: true, roomNumber: true },
+    })
+
+    await tx.building.update({
+      where: { id: buildingId },
+      data: { totalBeds: { increment: dto.capacity } },
+    })
+
+    return room
   })
 }
 

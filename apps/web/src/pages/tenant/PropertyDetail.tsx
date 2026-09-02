@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, MapPin, Phone, Users, Flag } from 'lucide-react'
+import { CalendarCheck, MapPin, Phone, Users, Flag, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,8 @@ import { showToast } from '@/components/ui/toaster'
 import { QUERY_KEYS } from '@/lib/utils/constants'
 import { cn } from '@/lib/utils/cn'
 import { ReportOwnerModal } from '@/components/ui/report-owner-modal'
+import { PropertyGallery } from './PropertyGallery'
+import { PropertyMap } from './PropertyMap'
 
 export default function PropertyDetailPage() {
   const buildingId = useRequiredParam('buildingId')
@@ -34,6 +36,19 @@ export default function PropertyDetailPage() {
       const { data } = await apiClient.get(`/buildings/${buildingId}/public`)
       return data.data
     },
+  })
+
+  const { data: nearbyBuildings } = useQuery({
+    queryKey: ['nearbyBuildings', property?.latitude, property?.longitude],
+    queryFn: async () => {
+      if (!property?.latitude || !property?.longitude) return []
+      const params = new URLSearchParams({
+        limit: '50'
+      }).toString()
+      const { data } = await apiClient.get(`/buildings/search?${params}`)
+      return data.data.items
+    },
+    enabled: !!property?.latitude && !!property?.longitude
   })
 
   const { mutate: createBooking, isPending: booking } = useMutation({
@@ -91,18 +106,21 @@ export default function PropertyDetailPage() {
   const minVisit = toLocalInput(new Date())
   const maxVisit = toLocalInput(maxDate)
 
+  const mapProperties = [
+    { ...property, id: property.id, name: property.name, latitude: property.latitude, longitude: property.longitude, minRent: property.roomOptions?.[0]?.baseRent, coverPhoto: property.photos?.[0]?.fileUrl },
+    ...(nearbyBuildings || []).filter((b: any) => b.id !== property.id).map((b: any) => ({
+      id: b.id, name: b.name, latitude: b.latitude, longitude: b.longitude, minRent: b.minRent, coverPhoto: b.coverPhoto
+    }))
+  ]
+
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Photos */}
-      {property.photos?.length > 0 && (
-        <div className="rounded-xl overflow-hidden">
-          <img
-            src={property.photos[0].fileUrl}
-            alt={property.name}
-            className="w-full h-56 object-cover"
-          />
-        </div>
-      )}
+      <PropertyGallery photos={property.photos} propertyName={property.name} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
+        {/* Left Column - Details */}
+        <div className="lg:col-span-2 space-y-6">
 
       {/* Header */}
       <div>
@@ -354,33 +372,69 @@ export default function PropertyDetailPage() {
         ))}
       </div>
 
-      {/* Booking CTA */}
-      {selectedBed && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-50 border-t border-gray-200 p-4 z-10 lg:static lg:bg-transparent lg:border-0 lg:p-0">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">Complete your booking</h3>
-            <div className="flex items-center justify-between mb-3 text-sm">
-              <span className="text-gray-600">Selected:</span>
-              <span className="font-medium">Bed {selectedBed.bedLabel} — {formatRupees(selectedBed.monthlyRent)}/mo</span>
+      {/* Mocked Reviews Section */}
+      <div className="pt-6 border-t border-gray-200">
+        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <Star className="w-5 h-5 fill-current text-gray-900" />
+          4.96 · 120 reviews
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[
+            { name: "Rahul S.", date: "August 2026", text: "Great place to stay! The owner is very responsive and the property is well maintained." },
+            { name: "Priya M.", date: "July 2026", text: "Absolutely loved my time here. It feels just like home, and the location is perfect." },
+            { name: "Amit K.", date: "June 2026", text: "Clean rooms and good amenities. Would definitely recommend to anyone looking for a PG." },
+            { name: "Sneha R.", date: "May 2026", text: "Very safe and secure environment. The food is also quite decent compared to other places." }
+          ].map((review, i) => (
+            <div key={i}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">
+                  {review.name.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 text-sm">{review.name}</h4>
+                  <p className="text-xs text-gray-500">{review.date}</p>
+                </div>
+              </div>
+              <p className="text-gray-700 text-sm line-clamp-3">{review.text}</p>
             </div>
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Move-in date <span className="text-red-500">*</span>
-              </label>
+          ))}
+        </div>
+      </div>
+
+        </div>
+
+        {/* Right Column - Sticky Map */}
+        <div className="lg:col-span-1 relative">
+          <div className="sticky top-6">
+            <Card className="p-0 overflow-hidden h-[400px]">
+              <PropertyMap properties={mapProperties} activePropertyId={property.id} />
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Overlay */}
+      {selectedBed && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold mb-4">Book your bed</h3>
+            <div className="mb-4 text-sm text-gray-600">
+              <p>Room: {selectedBed.roomNumber}</p>
+              <p>Bed: {selectedBed.bedLabel}</p>
+              <p className="font-semibold text-gray-900 mt-1">
+                {formatRupees(selectedBed.monthlyRent)} / month
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Move-in date</label>
               <input
                 type="date"
                 min={today}
                 max={maxDateStr}
                 value={moveInDate}
                 onChange={(e) => setMoveInDate(e.target.value)}
-                className="w-full h-10 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                className="w-full h-10 px-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
               />
-            </div>
-            <div className="flex items-center justify-between text-sm mb-3">
-              <span className="text-gray-600">Booking deposit:</span>
-              <span className="font-bold text-gray-900">
-                {formatRupees(selectedBed.monthlyRent * (property.depositMonths ?? 2))}
-              </span>
             </div>
             <Button
               className="w-full"
@@ -395,7 +449,7 @@ export default function PropertyDetailPage() {
             </Button>
             <button
               onClick={() => setSelectedBed(null)}
-              className="text-xs text-gray-400 hover:text-gray-600 mt-2 block text-center w-full"
+              className="text-xs text-gray-400 hover:text-gray-600 mt-4 block text-center w-full"
             >
               Cancel
             </button>
