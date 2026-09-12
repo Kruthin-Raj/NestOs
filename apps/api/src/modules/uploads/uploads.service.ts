@@ -281,12 +281,12 @@ export async function getDocumentFileService(
 ): Promise<{ absolutePath: string; mimeType: string; fileName: string }> {
   const ownerDoc = await prisma.ownerDocument.findUnique({
     where:  { id: documentId },
-    select: { fileKey: true, mimeType: true, fileName: true, owner: { select: { userId: true } } },
+    select: { fileKey: true, mimeType: true, fileName: true, documentType: true, owner: { select: { userId: true } } },
   })
 
   const tenantDoc = ownerDoc ? null : await prisma.tenantDocument.findUnique({
     where:  { id: documentId },
-    select: { fileKey: true, mimeType: true, fileName: true, tenant: { select: { userId: true } } },
+    select: { fileKey: true, mimeType: true, fileName: true, documentType: true, tenant: { select: { userId: true } } },
   })
 
   const doc = ownerDoc ?? tenantDoc
@@ -299,7 +299,8 @@ export async function getDocumentFileService(
   // Admins review verification documents; everyone else sees only their own.
   const isSelf  = ownerUserId === viewerUserId
   const isAdmin = viewerRole === 'SUPER_ADMIN'
-  if (!isSelf && !isAdmin) {
+  const isOther = doc.documentType === 'OTHER'
+  if (!isSelf && !isAdmin && !isOther) {
     throw new ForbiddenError('You do not have permission to view this document')
   }
 

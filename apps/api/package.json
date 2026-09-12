@@ -15,6 +15,7 @@
     "admin:create": "tsx prisma/create-admin.ts",
     "owner:create": "tsx prisma/create-owner.ts",
     "user:set-password": "tsx prisma/set-password.ts",
+    "backfill:coordinates": "tsx prisma/backfill-coordinates.ts",
     "db:reset": "prisma migrate reset --force",
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json"
   },
