@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
+import { Download, Eye, Loader2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -76,7 +78,24 @@ export default function TenantIssueDetailPage() {
       <Card>
         <CardTitle className="mb-2">Description</CardTitle>
         <p className="text-sm text-gray-700">{issue.description}</p>
-        <p className="text-xs text-gray-400 mt-2">{formatDateTime(issue.createdAt)}</p>
+        
+        {issue.photoUrls && issue.photoUrls.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-medium text-gray-700">Attachments</p>
+            <div className="flex flex-wrap gap-4">
+              {issue.photoUrls.map((url, i) => (
+                <IssueAttachment key={i} url={url} index={i} />
+              ))}
+            </div>
+          </div>
+        )}
+        
+        <div className="flex flex-col gap-1 mt-4">
+          <p className="text-xs text-gray-400">Created: {formatDateTime(issue.createdAt)}</p>
+          {issue.status === 'RESOLVED' && issue.resolvedAt && (
+            <p className="text-xs text-green-600 font-medium">Cleared: {formatDateTime(issue.resolvedAt)}</p>
+          )}
+        </div>
       </Card>
 
       {/* Comments */}
@@ -145,5 +164,105 @@ export default function TenantIssueDetailPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+function IssueAttachment({ url, index }: { url: string; index: number }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    async function load() {
+      try {
+        const fetchUrl = url.replace('/api/v1', '')
+        const res = await apiClient.get(fetchUrl, { responseType: 'blob' })
+        if (!active) return
+        const blob = res.data as Blob
+        setBlobUrl(URL.createObjectURL(blob))
+      } catch (e) {
+        console.error('Failed to load attachment', e)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    load()
+    return () => { active = false }
+  }, [url])
+
+  function handleDownload() {
+    if (!blobUrl) return
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = `attachment-${index + 1}`
+    a.click()
+  }
+
+  if (loading) {
+    return (
+      <div className="h-24 w-24 flex items-center justify-center border rounded-md bg-gray-50">
+        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  if (!blobUrl) {
+    return (
+      <div className="h-24 w-24 flex items-center justify-center border rounded-md bg-gray-50 text-xs text-red-500 text-center p-2">
+        Failed to load
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="group relative border rounded-md overflow-hidden h-24 w-24 cursor-pointer" onClick={() => setIsLightboxOpen(true)}>
+        <img src={blobUrl} alt={`Attachment ${index + 1}`} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsLightboxOpen(true) }}
+            className="text-white hover:text-indigo-200"
+            title="View"
+          >
+            <Eye className="h-5 w-5" />
+          </button>
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleDownload() }}
+            className="text-white hover:text-indigo-200"
+            title="Download"
+          >
+            <Download className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      
+      {isLightboxOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-8"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <div className="relative max-w-5xl max-h-full w-full h-full flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-0 right-0 flex gap-4 p-4 z-50 bg-black/50 rounded-bl-lg">
+              <button 
+                onClick={handleDownload} 
+                className="text-white hover:text-indigo-300 flex items-center gap-2 bg-black/50 px-3 py-1.5 rounded-md backdrop-blur-sm"
+              >
+                <Download className="h-5 w-5" /> Download
+              </button>
+              <button 
+                onClick={() => setIsLightboxOpen(false)} 
+                className="text-white hover:text-red-400 flex items-center gap-2 bg-black/50 px-3 py-1.5 rounded-md backdrop-blur-sm"
+              >
+                Close
+              </button>
+            </div>
+            <img src={blobUrl} alt={`Attachment ${index + 1}`} className="max-w-full max-h-full object-contain rounded-md shadow-2xl" />
+          </div>
+        </div>
+      )}
+    </>
   )
 }

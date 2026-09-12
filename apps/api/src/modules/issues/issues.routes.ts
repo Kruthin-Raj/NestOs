@@ -18,7 +18,7 @@ import {
 
 const commentSchema = z.object({
   body:      z.string().min(5).max(1000).trim(),
-  photoUrls: z.array(z.string().url()).max(3).optional(),
+  photoUrls: z.array(z.string()).max(3).optional(),
 })
 
 const createIssueSchema = z.object({
@@ -26,7 +26,7 @@ const createIssueSchema = z.object({
   priority:    z.enum(['LOW','MEDIUM','HIGH','URGENT']),
   title:       z.string().min(10).max(255).trim(),
   description: z.string().min(20).max(2000).trim(),
-  photoUrls:   z.array(z.string().url()).max(5).optional(),
+  photoUrls:   z.array(z.string()).max(5).optional(),
 })
 
 type IssueParams = { issueId: string }

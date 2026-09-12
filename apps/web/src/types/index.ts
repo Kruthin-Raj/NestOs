@@ -172,6 +172,7 @@ export interface Issue {
   photoUrls: string[]
   canReopen?: boolean
   reopenDeadline?: string
+  resolvedAt?: string
   createdAt: string
   updatedAt: string
   building?: { name: string }

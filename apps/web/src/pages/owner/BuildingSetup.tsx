@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRequiredParam } from '@/lib/utils/use-required-param'
-import { Card, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/shared/page-header'
 import { useBuilding } from '@/features/owner/buildings/hooks/use-buildings'
 import { PageLoader } from '@/components/feedback/loading-state'
-import { CheckCircle2, ChevronRight, Image as ImageIcon, Layers, Loader2, Plus, BedDouble, ArrowRight } from 'lucide-react'
+import { CheckCircle2, Image as ImageIcon, Layers, Loader2, BedDouble, ArrowRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import apiClient from '@/lib/api/client'
@@ -18,11 +18,8 @@ type Step = 'floors' | 'rooms' | 'photos' | 'done'
 
 export default function BuildingSetupPage() {
   const buildingId = useRequiredParam('buildingId')
-  const navigate = useNavigate()
   const { data: building, isLoading } = useBuilding(buildingId)
   const [currentStep, setCurrentStep] = useState<Step>('floors')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const qc = useQueryClient()
 
   if (isLoading || !building) return <PageLoader />
 
@@ -119,7 +116,7 @@ function FloorsStep({ buildingId, isApartment, onNext }: { buildingId: string; i
       }
       qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.floors(buildingId) })
       onNext()
-    } catch (err) {
+    } catch {
       showToast('Failed to create floors', 'error')
     } finally {
       setIsSubmitting(false)
@@ -217,7 +214,7 @@ function RoomsStep({ buildingId, isApartment, onNext }: { buildingId: string; is
       }
       qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.rooms(buildingId) })
       onNext()
-    } catch (err) {
+    } catch {
       showToast('Failed to create rooms', 'error')
     } finally {
       setIsSubmitting(false)
@@ -346,8 +343,9 @@ function PhotosStep({ buildingId, onNext }: { buildingId: string; onNext: () => 
       
       showToast('Photo added!', 'success')
       onNext()
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to upload photo'
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg = errorObj.response?.data?.message || errorObj.message || 'Failed to upload photo'
       showToast(msg, 'error')
     } finally {
       setIsSubmitting(false)

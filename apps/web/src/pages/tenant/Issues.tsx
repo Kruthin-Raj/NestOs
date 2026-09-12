@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, AlertCircle } from 'lucide-react'
+import { Plus, AlertCircle, Paperclip, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -29,6 +29,8 @@ const issueSchema = z.object({
 
 export default function TenantIssuesPage() {
   const [showForm, setShowForm] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -40,12 +42,43 @@ export default function TenantIssuesPage() {
   })
 
   const { mutate: raiseIssue, isPending } = useMutation({
-    mutationFn: (v: unknown) => apiClient.post('/issues', v),
+    mutationFn: async (v: unknown) => {
+      const photoUrls: string[] = []
+      
+      for (const file of attachments) {
+        const { data: presigned } = await apiClient.post('/uploads/presigned-url', {
+          documentType:  'OTHER',
+          fileName:      file.name,
+          mimeType:      file.type,
+          fileSizeBytes: file.size,
+        })
+
+        const put = await fetch(presigned.data.uploadUrl, {
+          method:  'PUT',
+          body:    file,
+          headers: { 'Content-Type': file.type },
+        })
+        if (!put.ok) throw new Error(`Failed to upload ${file.name}`)
+
+        const confirm = await apiClient.post('/uploads/confirm', {
+          fileKey:       presigned.data.fileKey,
+          documentType:  'OTHER',
+          fileName:      file.name,
+          fileSizeBytes: file.size,
+          mimeType:      file.type,
+        })
+        
+        photoUrls.push(`/api/v1/uploads/documents/${confirm.data.data.id}`)
+      }
+      
+      return apiClient.post('/issues', { ...(v as object), photoUrls })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.issues.my() })
       showToast('Issue raised. Owner has been notified.', 'success')
       setShowForm(false)
       reset()
+      setAttachments([])
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -57,6 +90,32 @@ export default function TenantIssuesPage() {
     resolver: zodResolver(issueSchema),
   })
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return
+    const newFiles = Array.from(e.target.files)
+    
+    const validFiles = newFiles.filter(file => {
+      if (file.size > 2 * 1024 * 1024) {
+        showToast(`${file.name} is larger than 2MB`, 'error')
+        return false
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        showToast(`${file.name} is not a valid image format`, 'error')
+        return false
+      }
+      return true
+    })
+    
+    if (attachments.length + validFiles.length > 3) {
+      showToast('Maximum 3 attachments allowed', 'error')
+      setAttachments(prev => [...prev, ...validFiles].slice(0, 3))
+    } else {
+      setAttachments(prev => [...prev, ...validFiles])
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const issues: Issue[] = data?.items ?? []
 
   return (
@@ -66,7 +125,7 @@ export default function TenantIssuesPage() {
         description="Report and track maintenance requests"
         actions={
           <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="h-4 w-4 mr-1" />
+            {!showForm ? <Plus className="h-4 w-4 mr-1" /> : null}
             {showForm ? 'Cancel' : 'Raise issue'}
           </Button>
         }
@@ -107,6 +166,35 @@ export default function TenantIssuesPage() {
                 placeholder="The AC unit in room 101 bed A has not been cooling for 3 days..."
               />
             </FormField>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Attachments (Max 3, up to 2MB each)</label>
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((file, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-gray-100 rounded-md px-3 py-1.5 text-sm">
+                    <span className="truncate max-w-[150px]">{file.name}</span>
+                    <button type="button" onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-500">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                {attachments.length < 3 && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Paperclip className="h-4 w-4 mr-2" />
+                    Add Photo
+                  </Button>
+                )}
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={handleFileChange}
+              />
+            </div>
+
             <Button type="submit" loading={isPending}>
               Submit issue
             </Button>

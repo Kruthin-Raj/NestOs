@@ -15,7 +15,7 @@ import { QUERY_KEYS } from '@/lib/utils/constants'
 import { cn } from '@/lib/utils/cn'
 import { ReportOwnerModal } from '@/components/ui/report-owner-modal'
 import { PropertyGallery } from './PropertyGallery'
-import { PropertyMap } from './PropertyMap'
+import { PropertyMap, MapProperty } from './PropertyMap'
 
 export default function PropertyDetailPage() {
   const buildingId = useRequiredParam('buildingId')
@@ -27,7 +27,6 @@ export default function PropertyDetailPage() {
   const [visitAt, setVisitAt] = useState('')
   const [visitNote, setVisitNote] = useState('')
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
-  const [reportReason, setReportReason] = useState('')
   const queryClient = useQueryClient()
 
   const { data: property, isLoading } = useQuery({
@@ -106,9 +105,9 @@ export default function PropertyDetailPage() {
   const minVisit = toLocalInput(new Date())
   const maxVisit = toLocalInput(maxDate)
 
-  const mapProperties = [
+  const mapProperties: MapProperty[] = [
     { ...property, id: property.id, name: property.name, latitude: property.latitude, longitude: property.longitude, minRent: property.roomOptions?.[0]?.baseRent, coverPhoto: property.photos?.[0]?.fileUrl },
-    ...(nearbyBuildings || []).filter((b: any) => b.id !== property.id).map((b: any) => ({
+    ...(nearbyBuildings || []).filter((b: MapProperty) => b.id !== property.id).map((b: MapProperty) => ({
       id: b.id, name: b.name, latitude: b.latitude, longitude: b.longitude, minRent: b.minRent, coverPhoto: b.coverPhoto
     }))
   ]

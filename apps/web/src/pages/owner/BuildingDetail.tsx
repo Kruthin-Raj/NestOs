@@ -179,7 +179,7 @@ function FloorCard({ floor, buildingId }: { floor: Floor; buildingId: string }) 
   )
 }
 
-function BuildingPhotosGallery({ buildingId, photos }: { buildingId: string; photos: any[] }) {
+function BuildingPhotosGallery({ buildingId, photos }: { buildingId: string; photos: { fileUrl: string; id?: string; caption?: string }[] }) {
   const [isUploading, setIsUploading] = useState(false)
   const qc = useQueryClient()
 
@@ -211,8 +211,9 @@ function BuildingPhotosGallery({ buildingId, photos }: { buildingId: string; pho
       
       showToast('Photo uploaded successfully', 'success')
       qc.invalidateQueries({ queryKey: QUERY_KEYS.buildings.detail(buildingId) })
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to upload photo'
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg = errorObj.response?.data?.message || errorObj.message || 'Failed to upload photo'
       showToast(msg, 'error')
     } finally {
       setIsUploading(false)
